@@ -17,9 +17,7 @@ npm install
 npm run dev
 ```
 
-# cu.app: Complete Compliance Matrix
-**Cryptographic Pose Response | Precision-Coded | Zero Drama**
-
+# cu.app - infrastructure as proof™
 ---
 
 ## **Federal Banking & Credit Union Core Regulations**
