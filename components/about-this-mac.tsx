@@ -48,7 +48,7 @@ export function AboutThisMac({ onClose }: AboutThisMacProps) {
             <span className="font-medium text-gray-800 text-xs sm:text-sm">X02YZ1ZYZX</span>
           </div>
           <div className="flex justify-between py-2">
-            <span className="text-gray-600">macOS</span>
+            <span className="text-gray-600">CU OS</span>
             <span className="font-medium text-gray-800">Sequoia 15.0</span>
           </div>
         </div>

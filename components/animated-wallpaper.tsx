@@ -3,7 +3,7 @@
 export function AnimatedWallpaper() {
   return (
     <div className="absolute inset-0 overflow-hidden">
-      {/* macOS Big Sur inspired gradient wallpaper */}
+      {/* CU OS Big Sur inspired gradient wallpaper */}
       <div className="absolute inset-0 bg-gradient-to-br from-[#FF6B9D] via-[#FFA07A] to-[#FFD700]">
         {/* Layer 1: Pink to Orange wave */}
         <div

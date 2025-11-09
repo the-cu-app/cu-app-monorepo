@@ -23,7 +23,7 @@ interface MenuDropdownProps {
 
 function MenuDropdown({ items, onClose }: MenuDropdownProps) {
   return (
-    <div className="absolute top-full left-0 mt-1 min-w-[200px] bg-[var(--macos-menu-bg)] macos-blur border border-black/10 rounded-lg shadow-lg py-1 z-[9999]">
+    <div className="absolute top-full left-0 mt-1 min-w-[200px] bg-[var(--cu-menu-bg)] cu-blur border border-black/10 rounded-lg shadow-lg py-1 z-[9999]">
       {items.map((item, index) =>
         item.divider ? (
           <div key={index} className="h-px bg-black/10 my-1" />
@@ -129,7 +129,7 @@ export function MenuBar({
     { divider: true },
     { label: `${activeApp} Help`, action: () => console.log(`${activeApp} Help`) },
     { label: "Tips for Mac", action: () => console.log("Tips for Mac") },
-    { label: "macOS Support", action: () => console.log("macOS Support") },
+    { label: "CU OS Support", action: () => console.log("CU OS Support") },
   ]
 
   const menus = [

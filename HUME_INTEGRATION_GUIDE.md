@@ -7,7 +7,7 @@
 
 ## What We Built
 
-**OneScope Component:** `/Users/kylekusche/Downloads/macos-simulation/components/apps/onescope.tsx`
+**OneScope Component:** `/Users/kylekusche/Downloads/cu-app/components/apps/onescope.tsx`
 
 Features:
 - ✅ Role-based permission system (Admin, Manager, Teller, Member Advocate)
@@ -82,12 +82,12 @@ Member calls CU → Twilio → OneScope Backend
 
 ```bash
 # Create API routes in CU-OS
-mkdir -p /Users/kylekusche/Downloads/macos-simulation/app/api/ivr
-mkdir -p /Users/kylekusche/Downloads/macos-simulation/app/api/banking
+mkdir -p /Users/kylekusche/Downloads/cu-app/app/api/ivr
+mkdir -p /Users/kylekusche/Downloads/cu-app/app/api/banking
 
 # Copy service layer
 cp -r /Users/kylekusche/Desktop/SHEESH-pay-ai/services \
-      /Users/kylekusche/Downloads/macos-simulation/lib/
+      /Users/kylekusche/Downloads/cu-app/lib/
 
 # Adapt for Next.js App Router
 ```
@@ -633,13 +633,13 @@ USING (auth.role() = 'admin');
 
 **1. Start CU-OS:**
 ```bash
-cd /Users/kylekusche/Downloads/macos-simulation
+cd /Users/kylekusche/Downloads/cu-app
 npm run dev
 ```
 
 **2. Start HUME-enabled backend:**
 ```bash
-cd /Users/kylekusche/Downloads/macos-simulation
+cd /Users/kylekusche/Downloads/cu-app
 node server.js  # or integrate into Next.js
 ```
 

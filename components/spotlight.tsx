@@ -4,7 +4,7 @@ import type React from "react"
 
 import { useState, useEffect, useRef } from "react"
 import { Search, Calculator, Calendar, Folder, Music, ImageIcon, FileText } from "lucide-react"
-import type { AppType } from "./macos-desktop"
+import type { AppType } from "./desktop"
 
 interface SpotlightProps {
   onClose: () => void
@@ -48,7 +48,7 @@ export function Spotlight({ onClose, onOpenApp }: SpotlightProps) {
       onClick={onClose}
     >
       <div
-        className="w-[600px] bg-white/95 macos-blur rounded-xl shadow-2xl overflow-hidden"
+        className="w-[600px] bg-white/95 cu-blur rounded-xl shadow-2xl overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Search input */}

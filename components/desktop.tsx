@@ -78,12 +78,12 @@ interface ContextMenuState {
   items: Array<{ label: string; action: () => void; divider?: boolean }>
 }
 
-interface MacOSDesktopProps {
+interface CU OSDesktopProps {
   user: User
   onLogout: () => void
 }
 
-export function MacOSDesktop({ user, onLogout }: MacOSDesktopProps) {
+export function CU OSDesktop({ user, onLogout }: CU OSDesktopProps) {
   const [windows, setWindows] = useState<WindowState[]>([])
   const [highestZIndex, setHighestZIndex] = useState(10)
   const [currentTime, setCurrentTime] = useState(new Date())

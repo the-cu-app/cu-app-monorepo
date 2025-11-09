@@ -237,12 +237,12 @@
 ## File Locations
 
 **OneScope Component:**
-- `/Users/kylekusche/Downloads/macos-simulation/components/apps/onescope.tsx`
+- `/Users/kylekusche/Downloads/cu-app/components/apps/onescope.tsx`
 
 **Documentation:**
-- `/Users/kylekusche/Downloads/macos-simulation/ONESCOPE_PERMISSIONS_SPEC.md`
-- `/Users/kylekusche/Downloads/macos-simulation/HUME_INTEGRATION_GUIDE.md`
-- `/Users/kylekusche/Downloads/macos-simulation/ONESCOPE_COMPLETE.md` (this file)
+- `/Users/kylekusche/Downloads/cu-app/ONESCOPE_PERMISSIONS_SPEC.md`
+- `/Users/kylekusche/Downloads/cu-app/HUME_INTEGRATION_GUIDE.md`
+- `/Users/kylekusche/Downloads/cu-app/ONESCOPE_COMPLETE.md` (this file)
 
 **HUME Reference Implementation:**
 - `/Users/kylekusche/Desktop/SHEESH-pay-ai/server.js`
@@ -250,7 +250,7 @@
 - `/Users/kylekusche/Desktop/SHEESH-pay-ai/HOW_IT_WORKS.md`
 
 **CU-OS Base:**
-- `/Users/kylekusche/Downloads/macos-simulation/`
+- `/Users/kylekusche/Downloads/cu-app/`
 
 ---
 

@@ -11,7 +11,7 @@
 ### 1. Generate the Scaffold (10 seconds)
 
 ```bash
-cd /Users/kylekusche/Downloads/macos-simulation
+cd /Users/kylekusche/Downloads/cu-app
 node scripts/add-v0-app.js loan-applications "Loan Apps" indigo
 ```
 
@@ -29,8 +29,8 @@ node scripts/add-v0-app.js loan-applications "Loan Apps" indigo
    ✅ Added LoanApplicationsIcon
 📝 Step 3: Updating dock.tsx...
    ✅ Updated dock.tsx
-📝 Step 4: Updating macos-desktop.tsx...
-   ✅ Updated macos-desktop.tsx
+📝 Step 4: Updating desktop.tsx...
+   ✅ Updated desktop.tsx
 
 ✨ Success! Your V0 app scaffold is ready!
 ```
@@ -316,7 +316,7 @@ Production-ready
 ## Get Started Now
 
 ```bash
-cd /Users/kylekusche/Downloads/macos-simulation
+cd /Users/kylekusche/Downloads/cu-app
 
 # Add your first app
 node scripts/add-v0-app.js my-first-app "My App" blue

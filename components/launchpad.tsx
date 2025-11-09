@@ -1,6 +1,6 @@
 "use client"
 
-import type { AppType } from "./macos-desktop"
+import type { AppType } from "./desktop"
 import {
   FinderIcon,
   SafariIcon,

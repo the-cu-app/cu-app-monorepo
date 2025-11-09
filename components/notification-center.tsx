@@ -32,7 +32,7 @@ const notifications = [
 
 export function NotificationCenter({ onClose }: NotificationCenterProps) {
   return (
-    <div className="fixed top-7 right-0 w-[380px] h-[calc(100vh-7rem)] bg-white/95 macos-blur border-l border-gray-200 shadow-2xl z-[60] flex flex-col">
+    <div className="fixed top-7 right-0 w-[380px] h-[calc(100vh-7rem)] bg-white/95 cu-blur border-l border-gray-200 shadow-2xl z-[60] flex flex-col">
       {/* Header */}
       <div className="flex items-center justify-between p-4 border-b border-gray-200">
         <h2 className="font-semibold text-lg">Notification Center</h2>

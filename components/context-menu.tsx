@@ -9,7 +9,7 @@ interface ContextMenuProps {
 export function ContextMenu({ x, y, items }: ContextMenuProps) {
   return (
     <div
-      className="fixed bg-[var(--macos-menu-bg)] macos-blur border border-black/10 rounded-lg shadow-lg py-1 z-[60] min-w-[200px]"
+      className="fixed bg-[var(--cu-menu-bg)] cu-blur border border-black/10 rounded-lg shadow-lg py-1 z-[60] min-w-[200px]"
       style={{ left: x, top: y }}
       onClick={(e) => e.stopPropagation()}
     >

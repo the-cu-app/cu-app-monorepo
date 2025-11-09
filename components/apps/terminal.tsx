@@ -7,7 +7,7 @@ import { useState, useRef, useEffect } from "react"
 export function Terminal() {
   const [history, setHistory] = useState<string[]>([
     "Last login: " + new Date().toLocaleString(),
-    "Welcome to macOS Terminal",
+    "Welcome to CU OS Terminal",
     "",
   ])
   const [currentCommand, setCurrentCommand] = useState("")
@@ -107,9 +107,9 @@ drwx------  2 developer  staff    64 Dec 11 16:00 Videos`
         break
       case "neofetch":
         output = `
-                    ###                  developer@macOS
+                    ###                  developer@CU OS
                   ####                   ----------------
-                 ###                     OS: macOS Sonoma 14.0
+                 ###                     OS: CU OS Sonoma 14.0
          #######    #######              Host: MacBook Pro (16-inch, 2023)
        ######################            Kernel: Darwin 23.0.0
       #####################              Uptime: 2 days, 5 hours
@@ -170,7 +170,7 @@ drwx------  2 developer  staff    64 Dec 11 16:00 Videos`
         output = `zsh: command not found: ${command}`
     }
 
-    setHistory([...history, `developer@macOS ~ % ${cmd}`, output])
+    setHistory([...history, `developer@CU OS ~ % ${cmd}`, output])
   }
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -193,7 +193,7 @@ drwx------  2 developer  staff    64 Dec 11 16:00 Videos`
         </div>
       ))}
       <form onSubmit={handleSubmit} className="flex items-center gap-2 flex-wrap">
-        <span className="text-blue-400">developer@macOS</span>
+        <span className="text-blue-400">developer@CU OS</span>
         <span className="text-white">~</span>
         <span className="text-purple-400">%</span>
         <input

@@ -43,7 +43,7 @@ const documentsFiles = [
 ]
 
 const downloadsFiles = [
-  { name: "macOS-installer.dmg", type: "file", size: "12.4 GB", modified: "Today, 3:45 PM", icon: "file" },
+  { name: "CU OS-installer.dmg", type: "file", size: "12.4 GB", modified: "Today, 3:45 PM", icon: "file" },
   { name: "VS-Code-Setup.zip", type: "file", size: "156 MB", modified: "Today, 2:15 PM", icon: "file" },
   { name: "wallpaper-collection.zip", type: "file", size: "45 MB", modified: "Yesterday", icon: "file" },
   { name: "node-modules.tar.gz", type: "file", size: "234 MB", modified: "Jan 14, 2024", icon: "file" },

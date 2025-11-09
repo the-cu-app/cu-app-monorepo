@@ -38,7 +38,7 @@ V0 will give you React/TypeScript code. Copy the entire component.
 
 ### Step 3: Create App File
 ```bash
-cd /Users/kylekusche/Downloads/macos-simulation
+cd /Users/kylekusche/Downloads/cu-app
 touch components/apps/teller-transactions.tsx
 ```
 
@@ -80,7 +80,7 @@ const dockApps = [
 ]
 ```
 
-### Step 7: Add Type (macos-desktop.tsx)
+### Step 7: Add Type (desktop.tsx)
 ```typescript
 export type AppType =
   | "finder"
@@ -89,7 +89,7 @@ export type AppType =
   // ... rest
 ```
 
-### Step 8: Add Import & Render (macos-desktop.tsx)
+### Step 8: Add Import & Render (desktop.tsx)
 ```typescript
 import { TellerTransactions } from "./apps/teller-transactions"
 
@@ -259,7 +259,7 @@ Create a CLI tool:
 # 1. Creates components/apps/teller-transactions.tsx
 # 2. Adds icon to app-icons.tsx
 # 3. Updates dock.tsx
-# 4. Updates macos-desktop.tsx AppType
+# 4. Updates desktop.tsx AppType
 # 5. Adds render case
 # 6. Commits to git
 ```
@@ -385,7 +385,7 @@ Production (Vercel)
 
 **V0 Docs:** https://v0.dev/docs
 **Next.js Docs:** https://nextjs.org/docs
-**CU-OS Location:** `/Users/kylekusche/Downloads/macos-simulation/`
+**CU-OS Location:** `/Users/kylekusche/Downloads/cu-app/`
 
 ---
 
