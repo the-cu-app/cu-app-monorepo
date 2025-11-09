@@ -1,0 +1,1454 @@
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:cu_design_system_omni/cu_design_system_omni.dart';
+import '../services/auth_service.dart';
+import '../services/sound_service.dart';
+import '../widgets/unified_search_bar.dart';
+import 'accessibility_settings_screen.dart';
+import 'security_settings_screen.dart';
+import 'fraud_protection_screen.dart';
+import 'export_1033_screen.dart';
+import '../main.dart';
+
+class SettingsScreen extends ConsumerStatefulWidget {
+  final Function(bool)? onThemeToggle;
+  final bool? currentTheme;
+
+  const SettingsScreen({super.key, this.onThemeToggle, this.currentTheme});
+
+  @override
+  ConsumerState<SettingsScreen> createState() => _SettingsScreenState();
+}
+
+class _SettingsScreenState extends ConsumerState<SettingsScreen> {
+  final AuthService _authService = AuthService();
+
+  String _themeMode = 'system';
+  bool _notificationsEnabled = true;
+  bool _biometricEnabled = false;
+  bool _pilotModeEnabled = false;
+  bool _uiSoundsEnabled = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _themeMode = widget.currentTheme == null
+        ? 'system'
+        : (widget.currentTheme! ? 'dark' : 'light');
+    _loadSettings();
+  }
+
+  Future<void> _loadSettings() async {
+    try {
+      final biometricAvailable = await _authService.isBiometricAvailable;
+      final biometricEnabled = await _authService.isBiometricEnabled;
+
+      final prefs = await SharedPreferences.getInstance();
+      final pilotMode = prefs.getBool('pilot_mode') ?? false;
+      final uiSounds = prefs.getBool('ui_sounds_enabled') ?? true;
+
+      setState(() {
+        _biometricEnabled = biometricEnabled && biometricAvailable;
+        _pilotModeEnabled = pilotMode;
+        _uiSoundsEnabled = uiSounds;
+      });
+    } catch (e) {
+      // Handle error
+    }
+  }
+
+  Future<void> _togglePilotMode(bool value) async {
+    WidgetJourneyLogger.log(
+      'settings_pilot_mode_toggle',
+      details: {'enabled': value},
+    );
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('pilot_mode', value);
+    setState(() {
+      _pilotModeEnabled = value;
+    });
+
+    if (value && mounted) {
+      CUToaster.show(
+        context,
+        title: 'Pilot Mode Enabled',
+        description: 'Shake your device to send feedback',
+        type: CUToastType.info,
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDesktop = MediaQuery.of(context).size.width > 800;
+    final controller = ref.watch(cuDesignControllerProvider);
+    final theme = Theme.of(context);
+
+    return Scaffold(
+      appBar: AppBar(
+        title: CUTypography.h3(
+          'Settings',
+          style: TextStyle(
+            color: theme.colorScheme.onSurface,
+            fontFamily: 'Geist',
+          ),
+        ),
+        centerTitle: true,
+      ),
+      body: Center(
+        child: Container(
+          constraints: BoxConstraints(
+            maxWidth: isDesktop ? 800 : double.infinity,
+          ),
+          child: ListView(
+            padding: EdgeInsets.all(isDesktop ? 40.0 : 16.0),
+            children: [
+              // Search Bar
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 8.0),
+                child: _buildSearchBar(),
+              ),
+              const SizedBox(height: 16),
+
+              // CU Design System Settings
+              if (controller != null) ...[
+                _buildSectionHeader('UI/UX Preferences'),
+                _buildCUDesignSettings(controller),
+                const SizedBox(height: 24),
+              ],
+
+              _buildSectionHeader('Account & Security'),
+              _buildSettingItem(
+                icon: Icons.person_outline,
+                title: 'Profile Information',
+                description: 'Update your personal details',
+                onTap: () {
+                  WidgetJourneyLogger.log('settings_profile_tapped');
+                  _showProfileDialog(context);
+                },
+              ),
+              _buildSettingItem(
+                icon: Icons.security,
+                title: 'Security Settings',
+                description: 'Password, 2FA, and security options',
+                onTap: () {
+                  WidgetJourneyLogger.log('settings_security_tapped');
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const SecuritySettingsScreen(),
+                    ),
+                  );
+                },
+              ),
+              _buildSettingItem(
+                icon: Icons.fingerprint,
+                title: 'Biometric Authentication',
+                description: 'Use Face ID or Touch ID to sign in',
+                trailing: CUSwitch(
+                  value: _biometricEnabled,
+                  onChanged: _biometricEnabled ? _toggleBiometric : null,
+                ),
+              ),
+              const SizedBox(height: 24),
+
+              _buildSectionHeader('Banking & Accounts'),
+              _buildSettingItem(
+                icon: Icons.account_balance,
+                title: 'Connect More Accounts',
+                description: 'Link additional bank accounts or credit cards',
+                onTap: () {
+                  WidgetJourneyLogger.log('settings_connect_accounts_tapped');
+                  _navigateToConnectAccounts(context);
+                },
+              ),
+              _buildSettingItem(
+                icon: Icons.notifications_outlined,
+                title: 'Notifications',
+                description: 'Manage your notification preferences',
+                trailing: CUSwitch(
+                  value: _notificationsEnabled,
+                  onChanged: (value) {
+                    WidgetJourneyLogger.log(
+                      'settings_notifications_toggle',
+                      details: {'enabled': value},
+                    );
+                    setState(() {
+                      _notificationsEnabled = value;
+                    });
+                  },
+                ),
+              ),
+              _buildSettingItem(
+                icon: Icons.download,
+                title: 'Export Data (CFPB §1033)',
+                description: 'Download your financial data in compliant format',
+                onTap: () {
+                  WidgetJourneyLogger.log('settings_export_1033_tapped');
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const Export1033Screen(),
+                    ),
+                  );
+                },
+              ),
+              const SizedBox(height: 24),
+
+              _buildSectionHeader('App & Display'),
+              _buildSettingItem(
+                icon: Icons.dark_mode,
+                title: 'Theme',
+                description: _themeMode == 'system'
+                    ? 'System default'
+                    : (_themeMode == 'dark' ? 'Dark mode' : 'Light mode'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () {
+                  WidgetJourneyLogger.log('settings_theme_tapped');
+                  _showThemeDialog(context);
+                },
+              ),
+              _buildSettingItem(
+                icon: Icons.accessibility_new,
+                title: 'Accessibility',
+                description: 'Color blindness support and visual preferences',
+                onTap: () {
+                  WidgetJourneyLogger.log('settings_accessibility_tapped');
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const AccessibilitySettingsScreen(),
+                    ),
+                  );
+                },
+              ),
+              _buildSettingItem(
+                icon: Icons.volume_up,
+                title: 'UI Sounds',
+                description: 'Button taps and interface sounds',
+                trailing: CUSwitch(
+                  value: _uiSoundsEnabled,
+                  onChanged: (value) async {
+                    WidgetJourneyLogger.log(
+                      'settings_ui_sounds_toggle',
+                      details: {'enabled': value},
+                    );
+                    setState(() {
+                      _uiSoundsEnabled = value;
+                    });
+                    final prefs = await SharedPreferences.getInstance();
+                    await prefs.setBool('ui_sounds_enabled', value);
+                    await SoundService().updateSoundSetting(value);
+                  },
+                ),
+              ),
+              _buildSettingItem(
+                icon: Icons.language,
+                title: 'Language',
+                description: 'English (US)',
+                onTap: () {
+                  WidgetJourneyLogger.log('settings_language_tapped');
+                  _showLanguageDialog(context);
+                },
+              ),
+              const SizedBox(height: 24),
+
+              _buildSectionHeader('Developer Options'),
+              _buildSettingItem(
+                icon: Icons.smart_toy,
+                title: 'AI Account Setup (Demo)',
+                description: 'Try our AI-driven account creation experience',
+                onTap: () {
+                  WidgetJourneyLogger.log('settings_ai_signup_tapped');
+                  Navigator.of(context).pushNamed('/ai-signup');
+                },
+              ),
+              _buildSettingItem(
+                icon: Icons.account_tree,
+                title: 'Browse Account Products',
+                description: 'View available banking and investment products',
+                onTap: () {
+                  WidgetJourneyLogger.log('settings_account_products_tapped');
+                  Navigator.of(context).pushNamed('/account-products');
+                },
+              ),
+              _buildSettingItem(
+                icon: Icons.bug_report_outlined,
+                title: 'Pilot Mode',
+                description: 'Shake to give feedback',
+                trailing: CUSwitch(
+                  value: _pilotModeEnabled,
+                  onChanged: _togglePilotMode,
+                ),
+              ),
+              const SizedBox(height: 24),
+
+              _buildSectionHeader('Support & About'),
+              _buildSettingItem(
+                icon: Icons.help_outline,
+                title: 'Help & Support',
+                description: 'Get help and contact support',
+                onTap: () {
+                  WidgetJourneyLogger.log('settings_help_tapped');
+                  _showHelpDialog(context);
+                },
+              ),
+              _buildSettingItem(
+                icon: Icons.info_outline,
+                title: 'About CU_APP',
+                description: 'Version 1.0.0',
+                onTap: () {
+                  WidgetJourneyLogger.log('settings_about_tapped');
+                  _showAboutDialog(context);
+                },
+              ),
+              const SizedBox(height: 24),
+
+              _buildCertificationBadge(),
+              const SizedBox(height: 32),
+              _buildSignOutButton(),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCUDesignSettings(controller) {
+    final theme = Theme.of(context);
+
+    return Column(
+      children: [
+        // Animations
+        _buildSettingItem(
+          icon: Icons.animation,
+          title: 'Animations',
+          description: 'Enable smooth transitions and effects',
+          trailing: CUSwitch(
+            value: controller.animationsEnabled,
+            onChanged: controller.canOverrideSettings
+                ? (val) {
+                    WidgetJourneyLogger.log(
+                      'settings_animations_toggle',
+                      details: {'enabled': val},
+                    );
+                    controller.updateAnimations(val);
+                  }
+                : null,
+          ),
+        ),
+
+        // Sound Effects
+        _buildSettingItem(
+          icon: Icons.volume_up,
+          title: 'Sound Effects',
+          description: 'Play audio feedback for interactions',
+          trailing: CUSwitch(
+            value: controller.soundEnabled,
+            onChanged: controller.canOverrideSettings
+                ? (val) {
+                    WidgetJourneyLogger.log(
+                      'settings_sound_effects_toggle',
+                      details: {'enabled': val},
+                    );
+                    controller.updateSound(val);
+                  }
+                : null,
+          ),
+        ),
+
+        // Volume Slider
+        if (controller.soundEnabled)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: CUCard(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          width: 40,
+                          height: 40,
+                          decoration: BoxDecoration(
+                            color: theme.colorScheme.primaryContainer.withOpacity(0.3),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Icon(
+                            Icons.volume_down,
+                            color: theme.colorScheme.primary,
+                            size: 20,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: CULabel(
+                            text: 'Volume: ${(controller.soundVolume * 100).toInt()}%',
+                            style: TextStyle(
+                              fontFamily: 'Geist',
+                              fontSize: 16,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    CUSlider(
+                      value: controller.soundVolume,
+                      onChanged: controller.canOverrideSettings
+                          ? (val) {
+                              WidgetJourneyLogger.log(
+                                'settings_volume_changed',
+                                details: {'volume': val},
+                              );
+                              controller.updateVolume(val);
+                            }
+                          : null,
+                      min: 0.0,
+                      max: 1.0,
+                      divisions: 10,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+
+        // Haptic Feedback
+        _buildSettingItem(
+          icon: Icons.vibration,
+          title: 'Haptic Feedback',
+          description: 'Vibration feedback for interactions',
+          trailing: CUSwitch(
+            value: controller.hapticsEnabled,
+            onChanged: controller.canOverrideSettings
+                ? (val) {
+                    WidgetJourneyLogger.log(
+                      'settings_haptics_toggle',
+                      details: {'enabled': val},
+                    );
+                    controller.updateHaptics(val);
+                  }
+                : null,
+          ),
+        ),
+
+        // Reduce Motion
+        _buildSettingItem(
+          icon: Icons.motion_photos_off,
+          title: 'Reduce Motion',
+          description: 'Minimize animations for motion sensitivity',
+          trailing: CUSwitch(
+            value: controller.reduceMotion,
+            onChanged: controller.canOverrideSettings
+                ? (val) {
+                    WidgetJourneyLogger.log(
+                      'settings_reduce_motion_toggle',
+                      details: {'enabled': val},
+                    );
+                    controller.updateReduceMotion(val);
+                  }
+                : null,
+          ),
+        ),
+
+        // High Contrast
+        _buildSettingItem(
+          icon: Icons.contrast,
+          title: 'High Contrast',
+          description: 'Increase contrast for better visibility',
+          trailing: CUSwitch(
+            value: controller.highContrast,
+            onChanged: controller.canOverrideSettings
+                ? (val) {
+                    WidgetJourneyLogger.log(
+                      'settings_high_contrast_toggle',
+                      details: {'enabled': val},
+                    );
+                    controller.updateHighContrast(val);
+                  }
+                : null,
+          ),
+        ),
+
+        // Font Scale Slider
+        Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: CUCard(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.primaryContainer.withOpacity(0.3),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Icon(
+                          Icons.text_fields,
+                          color: theme.colorScheme.primary,
+                          size: 20,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: CULabel(
+                          text: 'Font Scale: ${controller.fontScale.toStringAsFixed(1)}x',
+                          style: TextStyle(
+                            fontFamily: 'Geist',
+                            fontSize: 16,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  CUSlider(
+                    value: controller.fontScale,
+                    onChanged: controller.canOverrideSettings
+                        ? (val) {
+                            WidgetJourneyLogger.log(
+                              'settings_font_scale_changed',
+                              details: {'scale': val},
+                            );
+                            controller.updateFontScale(val);
+                          }
+                        : null,
+                    min: 0.5,
+                    max: 2.0,
+                    divisions: 15,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+
+        // Theme Mode Toggle Group
+        if (controller.canOverrideSettings)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: CUCard(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          width: 40,
+                          height: 40,
+                          decoration: BoxDecoration(
+                            color: theme.colorScheme.primaryContainer.withOpacity(0.3),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Icon(
+                            Icons.palette,
+                            color: theme.colorScheme.primary,
+                            size: 20,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: CULabel(
+                            text: 'Theme Mode',
+                            style: TextStyle(
+                              fontFamily: 'Geist',
+                              fontSize: 16,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    CUToggleGroup(
+                      type: CUToggleGroupType.single,
+                      value: controller.themeMode,
+                      onChanged: (value) {
+                        if (value != null) {
+                          WidgetJourneyLogger.log(
+                            'settings_theme_mode_changed',
+                            details: {'mode': value},
+                          );
+                          controller.updateThemeMode(value);
+                        }
+                      },
+                      items: const [
+                        CUToggleGroupItem(value: 'light', label: 'Light'),
+                        CUToggleGroupItem(value: 'dark', label: 'Dark'),
+                        CUToggleGroupItem(value: 'system', label: 'System'),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+
+        // Admin Override Warning
+        if (controller.forceAccessibilityMode)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: CUAlert(
+              type: CUAlertType.warning,
+              title: 'Administrator Override Active',
+              description: 'Settings locked for accessibility compliance',
+              icon: Icons.admin_panel_settings,
+            ),
+          ),
+
+        // Settings Locked Warning
+        if (!controller.canOverrideSettings && !controller.forceAccessibilityMode)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: CUAlert(
+              type: CUAlertType.destructive,
+              title: 'Settings Locked',
+              description: 'Contact administrator to modify settings',
+              icon: Icons.lock,
+            ),
+          ),
+
+        // Last Synced Info
+        if (controller.lastSyncedAt != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 8, bottom: 12),
+            child: CUTypography.small(
+              'Last synced ${_formatTimestamp(controller.lastSyncedAt!)} '
+              'from ${controller.syncedFrom ?? "unknown"}',
+              style: TextStyle(
+                color: theme.colorScheme.onSurfaceVariant,
+                fontFamily: 'Geist',
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ),
+      ],
+    );
+  }
+
+  String _formatTimestamp(DateTime timestamp) {
+    final now = DateTime.now();
+    final diff = now.difference(timestamp);
+
+    if (diff.inSeconds < 60) return '${diff.inSeconds}s ago';
+    if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
+    if (diff.inHours < 24) return '${diff.inHours}h ago';
+    return '${diff.inDays}d ago';
+  }
+
+  Widget _buildSectionHeader(String title) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16, top: 8),
+      child: CUTypography.h4(
+        title,
+        style: TextStyle(
+          color: theme.colorScheme.primary,
+          fontWeight: FontWeight.w600,
+          fontFamily: 'Geist',
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSettingItem({
+    required IconData icon,
+    required String title,
+    required String description,
+    Widget? trailing,
+    VoidCallback? onTap,
+  }) {
+    final theme = Theme.of(context);
+    final hasInteraction = onTap != null || trailing != null;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: CUItem(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+          child: Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.primaryContainer.withOpacity(0.3),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(
+                  icon,
+                  color: theme.colorScheme.primary,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    CUTypography.body(
+                      title,
+                      style: TextStyle(
+                        fontFamily: 'Geist',
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    CUTypography.small(
+                      description,
+                      style: TextStyle(
+                        color: theme.colorScheme.onSurfaceVariant,
+                        fontFamily: 'Geist',
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (trailing != null) ...[
+                const SizedBox(width: 12),
+                trailing,
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCertificationBadge() {
+    return CUCard(
+      gradient: LinearGradient(
+        colors: [
+          Colors.blue.shade700,
+          Colors.blue.shade900,
+        ],
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+      ),
+      child: InkWell(
+        onTap: () {
+          WidgetJourneyLogger.log('settings_certification_badge_tapped');
+          _showFraudEducationDialog();
+        },
+        borderRadius: BorderRadius.circular(16),
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Row(
+            children: [
+              CUAvatar(
+                size: CUAvatarSize.lg,
+                backgroundColor: Colors.white.withOpacity(0.2),
+                child: const Icon(
+                  Icons.verified,
+                  color: Colors.white,
+                  size: 32,
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        CUTypography.h4(
+                          'Certified No Cap App',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontFamily: 'Geist',
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        CUBadge(
+                          label: 'OFFICIAL',
+                          variant: CUBadgeVariant.success,
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    CUTypography.body(
+                      'The secure way to keep your cash',
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.9),
+                        fontFamily: 'Geist',
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        CUTypography.small(
+                          'Learn more about fraud protection',
+                          style: TextStyle(
+                            color: Colors.white.withOpacity(0.9),
+                            fontFamily: 'Geist',
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        Icon(
+                          Icons.arrow_forward,
+                          color: Colors.white.withOpacity(0.9),
+                          size: 16,
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSignOutButton() {
+    return SizedBox(
+      width: double.infinity,
+      child: CUButton(
+        onPressed: () {
+          WidgetJourneyLogger.log('settings_sign_out_tapped');
+          _signOut();
+        },
+        icon: const Icon(Icons.logout),
+        fullWidth: true,
+        variant: CUButtonVariant.destructive,
+        child: const Text('Sign Out', style: TextStyle(fontFamily: 'Geist')),
+      ),
+    );
+  }
+
+  Future<void> _toggleBiometric(bool value) async {
+    WidgetJourneyLogger.log(
+      'settings_biometric_toggle',
+      details: {'enabled': value},
+    );
+
+    try {
+      if (value) {
+        setState(() {
+          _biometricEnabled = true;
+        });
+        HapticFeedback.lightImpact();
+        _showToast('Biometric authentication enabled', CUToastType.success);
+      } else {
+        await _authService.disableBiometric();
+        setState(() {
+          _biometricEnabled = false;
+        });
+        HapticFeedback.lightImpact();
+        _showToast('Biometric authentication disabled', CUToastType.info);
+      }
+    } catch (e) {
+      _showToast('Failed to update biometric settings', CUToastType.destructive);
+    }
+  }
+
+  void _navigateToConnectAccounts(BuildContext context) {
+    Navigator.of(context).pushNamed('/plaid-link');
+  }
+
+  void _showProfileDialog(BuildContext context) {
+    showCUDialog(
+      context: context,
+      builder: (context) => CUDialog(
+        title: 'Profile Information',
+        description: 'Profile update functionality coming soon!',
+        actions: [
+          CUButton(
+            onPressed: () {
+              WidgetJourneyLogger.log('settings_profile_dialog_closed');
+              Navigator.pop(context);
+            },
+            child: const Text('OK', style: TextStyle(fontFamily: 'Geist')),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showLanguageDialog(BuildContext context) {
+    showCUDialog(
+      context: context,
+      builder: (context) => CUDialog(
+        title: 'Select Language',
+        description: 'Language selection functionality coming soon!',
+        actions: [
+          CUButton(
+            onPressed: () {
+              WidgetJourneyLogger.log('settings_language_dialog_closed');
+              Navigator.pop(context);
+            },
+            child: const Text('OK', style: TextStyle(fontFamily: 'Geist')),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showHelpDialog(BuildContext context) {
+    showCUDialog(
+      context: context,
+      builder: (context) => CUDialog(
+        title: 'Help & Support',
+        description: 'Help and support functionality coming soon!',
+        actions: [
+          CUButton(
+            onPressed: () {
+              WidgetJourneyLogger.log('settings_help_dialog_closed');
+              Navigator.pop(context);
+            },
+            child: const Text('OK', style: TextStyle(fontFamily: 'Geist')),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showThemeDialog(BuildContext context) {
+    String selectedTheme = _themeMode;
+
+    showCUDialog(
+      context: context,
+      builder: (context) => CUDialog(
+        title: 'Choose Theme',
+        child: StatefulBuilder(
+          builder: (context, setDialogState) {
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                CUItem(
+                  onTap: () {
+                    WidgetJourneyLogger.log(
+                      'settings_theme_selected',
+                      details: {'theme': 'system'},
+                    );
+                    setDialogState(() {
+                      selectedTheme = 'system';
+                    });
+                    setState(() {
+                      _themeMode = 'system';
+                    });
+                    widget.onThemeToggle?.call(false);
+                    Navigator.pop(context);
+                  },
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                    child: Row(
+                      children: [
+                        Icon(
+                          selectedTheme == 'system'
+                              ? Icons.radio_button_checked
+                              : Icons.radio_button_unchecked,
+                        ),
+                        const SizedBox(width: 12),
+                        CUTypography.body(
+                          'System default',
+                          style: const TextStyle(fontFamily: 'Geist'),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                CUItem(
+                  onTap: () {
+                    WidgetJourneyLogger.log(
+                      'settings_theme_selected',
+                      details: {'theme': 'light'},
+                    );
+                    setDialogState(() {
+                      selectedTheme = 'light';
+                    });
+                    setState(() {
+                      _themeMode = 'light';
+                    });
+                    widget.onThemeToggle?.call(false);
+                    Navigator.pop(context);
+                  },
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                    child: Row(
+                      children: [
+                        Icon(
+                          selectedTheme == 'light'
+                              ? Icons.radio_button_checked
+                              : Icons.radio_button_unchecked,
+                        ),
+                        const SizedBox(width: 12),
+                        CUTypography.body(
+                          'Light',
+                          style: const TextStyle(fontFamily: 'Geist'),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                CUItem(
+                  onTap: () {
+                    WidgetJourneyLogger.log(
+                      'settings_theme_selected',
+                      details: {'theme': 'dark'},
+                    );
+                    setDialogState(() {
+                      selectedTheme = 'dark';
+                    });
+                    setState(() {
+                      _themeMode = 'dark';
+                    });
+                    widget.onThemeToggle?.call(true);
+                    Navigator.pop(context);
+                  },
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                    child: Row(
+                      children: [
+                        Icon(
+                          selectedTheme == 'dark'
+                              ? Icons.radio_button_checked
+                              : Icons.radio_button_unchecked,
+                        ),
+                        const SizedBox(width: 12),
+                        CUTypography.body(
+                          'Dark',
+                          style: const TextStyle(fontFamily: 'Geist'),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  void _showAboutDialog(BuildContext context) {
+    showCUDialog(
+      context: context,
+      builder: (context) => CUDialog(
+        title: 'About SUPAHYPER',
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            CUTypography.body(
+              'SUPAHYPER Banking App',
+              style: const TextStyle(fontFamily: 'Geist'),
+            ),
+            const SizedBox(height: 8),
+            CUTypography.small(
+              'Version 1.0.0',
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                fontFamily: 'Geist',
+              ),
+            ),
+            const SizedBox(height: 8),
+            CUTypography.body(
+              'A modern banking experience powered by Plaid and Supabase.',
+              style: const TextStyle(fontFamily: 'Geist'),
+            ),
+          ],
+        ),
+        actions: [
+          CUButton(
+            onPressed: () {
+              WidgetJourneyLogger.log('settings_about_dialog_closed');
+              Navigator.pop(context);
+            },
+            child: const Text('OK', style: TextStyle(fontFamily: 'Geist')),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showToast(String message, CUToastType type) {
+    CUToaster.show(
+      context,
+      title: message,
+      type: type,
+    );
+  }
+
+  void _showFraudEducationDialog() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const FraudProtectionScreen(),
+      ),
+    );
+  }
+
+  Widget _buildSearchBar() {
+    return UnifiedSearchBar(
+      hintText: 'Search settings, help, or support...',
+      onTap: () {
+        WidgetJourneyLogger.log('settings_search_tapped');
+        showSearch(
+          context: context,
+          delegate: SettingsSearchDelegate(
+            theme: Theme.of(context),
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _signOut() async {
+    try {
+      final currentUser = _authService.currentUser;
+
+      if (currentUser == null) {
+        if (mounted) {
+          Navigator.of(context).pushNamedAndRemoveUntil('/auth', (route) => false);
+        }
+        return;
+      }
+
+      await _authService.signOut();
+
+      if (mounted) {
+        Navigator.of(context).pushNamedAndRemoveUntil('/auth', (route) => false);
+      }
+    } catch (e) {
+      _showToast('Failed to sign out: ${e.toString()}', CUToastType.destructive);
+    }
+  }
+}
+
+// Settings Search Delegate
+class SettingsSearchDelegate extends SearchDelegate {
+  final ThemeData theme;
+
+  SettingsSearchDelegate({required this.theme});
+
+  @override
+  ThemeData appBarTheme(BuildContext context) {
+    return theme.copyWith(
+      appBarTheme: AppBarTheme(
+        backgroundColor: theme.colorScheme.surface,
+        elevation: 0,
+        iconTheme: IconThemeData(color: theme.colorScheme.onSurface),
+        titleTextStyle: TextStyle(
+          color: theme.colorScheme.onSurface,
+          fontSize: 18,
+          fontFamily: 'Geist',
+        ),
+      ),
+      inputDecorationTheme: InputDecorationTheme(
+        hintStyle: TextStyle(
+          color: theme.colorScheme.onSurfaceVariant,
+          fontFamily: 'Geist',
+        ),
+        border: InputBorder.none,
+      ),
+    );
+  }
+
+  @override
+  String get searchFieldLabel => 'Search settings, help, support...';
+
+  @override
+  List<Widget> buildActions(BuildContext context) {
+    return [
+      if (query.isNotEmpty)
+        IconButton(
+          icon: const Icon(Icons.clear),
+          onPressed: () {
+            WidgetJourneyLogger.log('settings_search_cleared');
+            query = '';
+          },
+        ),
+    ];
+  }
+
+  @override
+  Widget buildLeading(BuildContext context) {
+    return IconButton(
+      icon: const Icon(Icons.arrow_back),
+      onPressed: () {
+        WidgetJourneyLogger.log('settings_search_closed');
+        close(context, null);
+      },
+    );
+  }
+
+  @override
+  Widget buildResults(BuildContext context) {
+    return _buildSearchResults(context);
+  }
+
+  @override
+  Widget buildSuggestions(BuildContext context) {
+    if (query.isEmpty) {
+      return _buildRecentSearches(context);
+    }
+    return _buildSearchResults(context);
+  }
+
+  Widget _buildRecentSearches(BuildContext context) {
+    final recentSearches = [
+      'Dark mode',
+      'Notifications',
+      'Biometric authentication',
+      'Security settings',
+      'Help and support',
+      'Language',
+      'Accessibility',
+    ];
+
+    return ListView(
+      children: [
+        Padding(
+          padding: const EdgeInsets.all(16),
+          child: CUTypography.h4(
+            'Recent Searches',
+            style: const TextStyle(
+              fontWeight: FontWeight.bold,
+              fontFamily: 'Geist',
+            ),
+          ),
+        ),
+        ...recentSearches.map(
+          (search) => CUItem(
+            onTap: () {
+              WidgetJourneyLogger.log(
+                'settings_search_recent_selected',
+                details: {'query': search},
+              );
+              query = search;
+              showResults(context);
+            },
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              child: Row(
+                children: [
+                  const Icon(Icons.history),
+                  const SizedBox(width: 12),
+                  CUTypography.body(
+                    search,
+                    style: const TextStyle(fontFamily: 'Geist'),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        const CUSeparator(),
+        Padding(
+          padding: const EdgeInsets.all(16),
+          child: CUTypography.h4(
+            'Quick Settings',
+            style: const TextStyle(
+              fontWeight: FontWeight.bold,
+              fontFamily: 'Geist',
+            ),
+          ),
+        ),
+        CUItem(
+          onTap: () {
+            WidgetJourneyLogger.log('settings_search_quick_dark_mode');
+            close(context, null);
+          },
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            child: Row(
+              children: [
+                const Icon(Icons.dark_mode),
+                const SizedBox(width: 12),
+                CUTypography.body(
+                  'Toggle Dark Mode',
+                  style: const TextStyle(fontFamily: 'Geist'),
+                ),
+              ],
+            ),
+          ),
+        ),
+        CUItem(
+          onTap: () {
+            WidgetJourneyLogger.log('settings_search_quick_notifications');
+            close(context, null);
+          },
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            child: Row(
+              children: [
+                const Icon(Icons.notifications),
+                const SizedBox(width: 12),
+                CUTypography.body(
+                  'Notification Settings',
+                  style: const TextStyle(fontFamily: 'Geist'),
+                ),
+              ],
+            ),
+          ),
+        ),
+        CUItem(
+          onTap: () {
+            WidgetJourneyLogger.log('settings_search_quick_security');
+            close(context, null);
+          },
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            child: Row(
+              children: [
+                const Icon(Icons.security),
+                const SizedBox(width: 12),
+                CUTypography.body(
+                  'Security Settings',
+                  style: const TextStyle(fontFamily: 'Geist'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSearchResults(BuildContext context) {
+    final results = _getSearchResults(query);
+
+    if (results.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.search_off,
+              size: 64,
+              color: theme.colorScheme.onSurfaceVariant.withOpacity(0.5),
+            ),
+            const SizedBox(height: 16),
+            CUTypography.large(
+              'No results found for "$query"',
+              style: const TextStyle(fontFamily: 'Geist'),
+            ),
+            const SizedBox(height: 8),
+            CUTypography.body(
+              'Try searching with different keywords',
+              style: TextStyle(
+                color: theme.colorScheme.onSurfaceVariant,
+                fontFamily: 'Geist',
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return ListView.builder(
+      itemCount: results.length,
+      itemBuilder: (context, index) {
+        final result = results[index];
+        return CUItem(
+          onTap: () {
+            WidgetJourneyLogger.log(
+              'settings_search_result_selected',
+              details: {'result': result['title']},
+            );
+            close(context, result);
+          },
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            child: Row(
+              children: [
+                Icon(result['icon'] as IconData),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      CUTypography.body(
+                        result['title'] as String,
+                        style: const TextStyle(fontFamily: 'Geist'),
+                      ),
+                      const SizedBox(height: 2),
+                      CUTypography.small(
+                        result['subtitle'] as String,
+                        style: TextStyle(
+                          color: theme.colorScheme.onSurfaceVariant,
+                          fontFamily: 'Geist',
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  List<Map<String, dynamic>> _getSearchResults(String query) {
+    final allResults = [
+      {
+        'title': 'Dark Mode',
+        'subtitle': 'Toggle between light and dark themes',
+        'icon': Icons.dark_mode,
+      },
+      {
+        'title': 'Notifications',
+        'subtitle': 'Manage your notification preferences',
+        'icon': Icons.notifications,
+      },
+      {
+        'title': 'Security Settings',
+        'subtitle': 'Password, 2FA, and security options',
+        'icon': Icons.security,
+      },
+      {
+        'title': 'Biometric Authentication',
+        'subtitle': 'Use Face ID or Touch ID to sign in',
+        'icon': Icons.fingerprint,
+      },
+      {
+        'title': 'Language',
+        'subtitle': 'Select your preferred language',
+        'icon': Icons.language,
+      },
+      {
+        'title': 'Accessibility',
+        'subtitle': 'Color blindness support and visual preferences',
+        'icon': Icons.accessibility_new,
+      },
+      {
+        'title': 'Help & Support',
+        'subtitle': 'Get help and contact support',
+        'icon': Icons.help_outline,
+      },
+    ];
+
+    if (query.isEmpty) return allResults;
+
+    return allResults.where((result) {
+      final title = (result['title'] as String).toLowerCase();
+      final subtitle = (result['subtitle'] as String).toLowerCase();
+      final q = query.toLowerCase();
+      return title.contains(q) || subtitle.contains(q);
+    }).toList();
+  }
+}

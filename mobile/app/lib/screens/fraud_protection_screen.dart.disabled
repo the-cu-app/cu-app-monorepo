@@ -1,0 +1,194 @@
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:cu_design_system_omni/cu_design_system_omni.dart';
+import '../services/widget_journey_logger.dart';
+import 'security_settings_screen.dart';
+
+class FraudProtectionScreen extends StatelessWidget {
+  const FraudProtectionScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return CUScaffold(
+      appBar: CUAppBar(
+        title: 'Fraud Protection',
+        centerTitle: true,
+        onBackPressed: () => Navigator.pop(context),
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(24.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Header with shield icon
+            Center(
+              child: Container(
+                width: 80,
+                height: 80,
+                decoration: BoxDecoration(
+                  color: Colors.blue.withOpacity(0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.security,
+                  size: 40,
+                  color: Colors.blue,
+                ),
+              ),
+            ),
+            const SizedBox(height: 24),
+
+            // How We Protect You section
+            Text(
+              'How We Protect You:',
+              style: theme.textTheme.headlineSmall?.copyWith(
+                fontWeight: FontWeight.bold,
+                fontFamily: 'Geist',
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            _buildProtectionItem(
+                '🔐', 'End-to-end encryption for all transactions'),
+            _buildProtectionItem('', 'Real-time fraud monitoring 24/7'),
+            _buildProtectionItem('👤', 'Biometric authentication'),
+            _buildProtectionItem(
+                '🔔', 'Instant alerts for suspicious activity'),
+            _buildProtectionItem(
+                '💳', 'Zero liability for unauthorized charges'),
+
+            const SizedBox(height: 32),
+
+            // Tips to Stay Safe section
+            Text(
+              'Tips to Stay Safe:',
+              style: theme.textTheme.headlineSmall?.copyWith(
+                fontWeight: FontWeight.bold,
+                fontFamily: 'Geist',
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            _buildProtectionItem('', 'Never share your login credentials'),
+            _buildProtectionItem('', 'Enable two-factor authentication'),
+            _buildProtectionItem('', 'Review transactions regularly'),
+            _buildProtectionItem('', 'Update your app regularly'),
+            _buildProtectionItem('', 'Report suspicious activity immediately'),
+
+            const SizedBox(height: 32),
+
+            // Report Fraud section
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: Colors.blue.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: Colors.blue.withOpacity(0.3),
+                  width: 1,
+                ),
+              ),
+              child: Column(
+                children: [
+                  const Icon(
+                    Icons.phone,
+                    size: 32,
+                    color: Colors.blue,
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    'Report Fraud',
+                    style: theme.textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      fontFamily: 'Geist',
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    '1-800-CU_APP',
+                    style: theme.textTheme.headlineSmall?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: Colors.blue,
+                      fontFamily: 'Geist',
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  ElevatedButton.icon(
+                    onPressed: () {
+                      // Copy phone number to clipboard
+                      Clipboard.setData(
+                          const ClipboardData(text: '1-800-CU_APP'));
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Phone number copied to clipboard'),
+                          behavior: SnackBarBehavior.floating,
+                        ),
+                      );
+                    },
+                    icon: const Icon(Icons.copy),
+                    label: const Text('Copy Number'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.blue,
+                      foregroundColor: Colors.white,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 32),
+
+            // Security Settings button
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const SecuritySettingsScreen(),
+                    ),
+                  );
+                },
+                icon: const Icon(Icons.security),
+                label: const Text('Security Settings'),
+                style: FilledButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildProtectionItem(String icon, String text) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            icon,
+            style: const TextStyle(fontSize: 20),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              text,
+              style: const TextStyle(
+                fontSize: 16,
+                fontFamily: 'Geist',
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+

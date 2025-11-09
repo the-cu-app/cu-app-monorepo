@@ -1,0 +1,400 @@
+import 'dart:async';
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:cu_1033_export_sdk/cu_1033_export_sdk.dart';
+import 'package:cu_design_system_omni/cu_design_system_omni.dart';
+import 'package:intl/intl.dart';
+
+class Export1033Screen extends ConsumerStatefulWidget {
+  const Export1033Screen({super.key});
+
+  @override
+  ConsumerState<Export1033Screen> createState() => _Export1033ScreenState();
+}
+
+class _Export1033ScreenState extends ConsumerState<Export1033Screen> {
+  final _formKey = GlobalKey<FormState>();
+  DateTime? _startDate;
+  DateTime? _endDate;
+  bool _includeAccounts = true;
+  bool _includeTransactions = true;
+  String? _currentExportId;
+  ExportStatus? _exportStatus;
+  bool _isLoading = false;
+  Timer? _pollTimer;
+
+  late ExportApiClient _apiClient;
+
+  @override
+  void initState() {
+    super.initState();
+    final supabase = Supabase.instance.client;
+    // Get URL from Supabase instance - use the same URL as initialized in main.dart
+    // TODO: Make this configurable or get from Supabase.instance.url if available
+    final supabaseUrl = 'https://svaiikywglmwedraxyda.supabase.co'; // Get from config
+    
+    _apiClient = ExportApiClient(
+      baseUrl: supabaseUrl,
+      getAuthToken: () => supabase.auth.currentSession?.accessToken ?? '',
+    );
+  }
+
+  @override
+  void dispose() {
+    _pollTimer?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _createExport() async {
+    if (!_formKey.currentState!.validate()) return;
+    if (_startDate == null || _endDate == null) return;
+
+    setState(() {
+      _isLoading = true;
+      _exportStatus = null;
+    });
+
+    try {
+      final request = ExportRequest(
+        dateRangeStart: DateFormat('yyyy-MM-dd').format(_startDate!),
+        dateRangeEnd: DateFormat('yyyy-MM-dd').format(_endDate!),
+        format: 'jsonl',
+        includeAccounts: _includeAccounts,
+        includeTransactions: _includeTransactions,
+      );
+
+      final response = await _apiClient.createExport(request);
+      
+      setState(() {
+        _currentExportId = response.exportId;
+        _isLoading = false;
+      });
+
+      // Start polling for status
+      _startPolling(response.exportId);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Export created: ${response.exportId}'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  void _startPolling(String exportId) {
+    _pollTimer?.cancel();
+    _pollTimer = Timer.periodic(const Duration(seconds: 3), (timer) async {
+      try {
+        final status = await _apiClient.getExportStatus(exportId);
+        setState(() {
+          _exportStatus = status;
+        });
+
+        if (status.status == ExportStatusType.completed ||
+            status.status == ExportStatusType.failed ||
+            status.status == ExportStatusType.expired) {
+          timer.cancel();
+        }
+      } catch (e) {
+        timer.cancel();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Error polling status: ${e.toString()}'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    });
+  }
+
+  Future<void> _checkStatus() async {
+    if (_currentExportId == null) return;
+
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      final status = await _apiClient.getExportStatus(_currentExportId!);
+      setState(() {
+        _exportStatus = status;
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return CUScaffold(
+      appBar: CUAppBar(
+        title: const Text('CFPB §1033 Data Export'),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: Form(
+          key: _formKey,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Text(
+                'Export your financial data',
+                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'Get a partial export of your accounts and transactions with enrichment data (quarter).',
+                style: TextStyle(color: Colors.grey),
+              ),
+              const SizedBox(height: 24),
+              
+              // Date Range Picker
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Date Range',
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 16),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: InkWell(
+                              onTap: () async {
+                                final date = await showDatePicker(
+                                  context: context,
+                                  initialDate: _startDate ?? DateTime.now().subtract(const Duration(days: 30)),
+                                  firstDate: DateTime.now().subtract(const Duration(days: 730)),
+                                  lastDate: DateTime.now(),
+                                );
+                                if (date != null) {
+                                  setState(() {
+                                    _startDate = date;
+                                  });
+                                }
+                              },
+                              child: InputDecorator(
+                                decoration: const InputDecoration(
+                                  labelText: 'Start Date',
+                                  suffixIcon: Icon(Icons.calendar_today),
+                                ),
+                                child: Text(
+                                  _startDate != null
+                                      ? DateFormat('yyyy-MM-dd').format(_startDate!)
+                                      : 'Select date',
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: InkWell(
+                              onTap: () async {
+                                final date = await showDatePicker(
+                                  context: context,
+                                  initialDate: _endDate ?? DateTime.now(),
+                                  firstDate: _startDate ?? DateTime.now().subtract(const Duration(days: 730)),
+                                  lastDate: DateTime.now(),
+                                );
+                                if (date != null) {
+                                  setState(() {
+                                    _endDate = date;
+                                  });
+                                }
+                              },
+                              child: InputDecorator(
+                                decoration: const InputDecoration(
+                                  labelText: 'End Date',
+                                  suffixIcon: Icon(Icons.calendar_today),
+                                ),
+                                child: Text(
+                                  _endDate != null
+                                      ? DateFormat('yyyy-MM-dd').format(_endDate!)
+                                      : 'Select date',
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              
+              const SizedBox(height: 16),
+              
+              // Include Options
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Export Options',
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 16),
+                      CheckboxListTile(
+                        title: const Text('Include Accounts'),
+                        value: _includeAccounts,
+                        onChanged: (value) {
+                          setState(() {
+                            _includeAccounts = value ?? true;
+                          });
+                        },
+                      ),
+                      CheckboxListTile(
+                        title: const Text('Include Transactions'),
+                        value: _includeTransactions,
+                        onChanged: (value) {
+                          setState(() {
+                            _includeTransactions = value ?? true;
+                          });
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              
+              const SizedBox(height: 24),
+              
+              // Submit Button
+              ElevatedButton(
+                onPressed: _isLoading ? null : _createExport,
+                style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                ),
+                child: _isLoading
+                    ? const SizedBox(
+                        height: 20,
+                        width: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Text('Create Export'),
+              ),
+              
+              // Export Status
+              if (_exportStatus != null) ...[
+                const SizedBox(height: 24),
+                Card(
+                  color: _exportStatus!.status == ExportStatusType.completed
+                      ? Colors.green.shade50
+                      : _exportStatus!.status == ExportStatusType.failed
+                          ? Colors.red.shade50
+                          : Colors.blue.shade50,
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              'Status: ${_exportStatus!.status.name}',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                              ),
+                            ),
+                            if (_exportStatus!.status != ExportStatusType.completed &&
+                                _exportStatus!.status != ExportStatusType.failed)
+                              IconButton(
+                                icon: const Icon(Icons.refresh),
+                                onPressed: _checkStatus,
+                              ),
+                          ],
+                        ),
+                        if (_exportStatus!.progressPercent != null) ...[
+                          const SizedBox(height: 8),
+                          LinearProgressIndicator(
+                            value: _exportStatus!.progressPercent! / 100,
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            '${_exportStatus!.progressPercent!.toStringAsFixed(0)}%',
+                            style: const TextStyle(fontSize: 12),
+                          ),
+                        ],
+                        if (_exportStatus!.recordCount != null) ...[
+                          const SizedBox(height: 8),
+                          Text('Records: ${_exportStatus!.recordCount}'),
+                        ],
+                        if (_exportStatus!.fileSizeBytes != null) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            'Size: ${(_exportStatus!.fileSizeBytes! / 1024).toStringAsFixed(2)} KB',
+                          ),
+                        ],
+                        if (_exportStatus!.downloadUrl != null) ...[
+                          const SizedBox(height: 16),
+                          ElevatedButton.icon(
+                            onPressed: () {
+                              // Open download URL
+                            },
+                            icon: const Icon(Icons.download),
+                            label: const Text('Download Export'),
+                          ),
+                        ],
+                        if (_exportStatus!.errorMessage != null) ...[
+                          const SizedBox(height: 8),
+                          Text(
+                            'Error: ${_exportStatus!.errorMessage}',
+                            style: const TextStyle(color: Colors.red),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+

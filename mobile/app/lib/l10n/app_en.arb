@@ -1,0 +1,197 @@
+{
+  "@@locale": "en",
+  "appTitle": "CU.APP",
+  "@appTitle": {
+    "description": "The title of the application"
+  },
+  
+  "dashboard": "Dashboard",
+  "@dashboard": {
+    "description": "Dashboard screen title"
+  },
+  
+  "services": "Services",
+  "@services": {
+    "description": "Services screen title"
+  },
+  
+  "transactions": "Transactions",
+  "@transactions": {
+    "description": "Transactions screen title"
+  },
+  
+  "transfer": "Transfer",
+  "@transfer": {
+    "description": "Transfer screen title"
+  },
+  
+  "settings": "Settings",
+  "@settings": {
+    "description": "Settings screen title"
+  },
+  
+  "accounts": "Accounts",
+  "@accounts": {
+    "description": "Accounts section title"
+  },
+  
+  "pinnedAccounts": "Pinned Accounts",
+  "@pinnedAccounts": {
+    "description": "Pinned accounts section title"
+  },
+  
+  "allAccounts": "All Accounts",
+  "@allAccounts": {
+    "description": "All accounts section title"
+  },
+  
+  "balance": "Balance",
+  "@balance": {
+    "description": "Account balance label"
+  },
+  
+  "currentBalance": "Current Balance",
+  "@currentBalance": {
+    "description": "Current balance label"
+  },
+  
+  "availableBalance": "Available",
+  "@availableBalance": {
+    "description": "Available balance label"
+  },
+  
+  "primary": "PRIMARY",
+  "@primary": {
+    "description": "Primary account indicator"
+  },
+  
+  "checking": "Checking",
+  "@checking": {
+    "description": "Checking account type"
+  },
+  
+  "savings": "Savings",
+  "@savings": {
+    "description": "Savings account type"
+  },
+  
+  "creditCard": "Credit Card",
+  "@creditCard": {
+    "description": "Credit card account type"
+  },
+  
+  "mortgage": "Mortgage",
+  "@mortgage": {
+    "description": "Mortgage account type"
+  },
+  
+  "personalLoan": "Personal Loan",
+  "@personalLoan": {
+    "description": "Personal loan account type"
+  },
+  
+  "moneyMarket": "Money Market",
+  "@moneyMarket": {
+    "description": "Money market account type"
+  },
+  
+  "brokerage": "Brokerage",
+  "@brokerage": {
+    "description": "Brokerage account type"
+  },
+  
+  "quickActions": "Quick Actions",
+  "@quickActions": {
+    "description": "Quick actions section title"
+  },
+  
+  "scanQr": "Scan QR",
+  "@scanQr": {
+    "description": "Scan QR code button"
+  },
+  
+  "findAtm": "Find ATM",
+  "@findAtm": {
+    "description": "Find ATM button"
+  },
+  
+  "appointments": "Appointments",
+  "@appointments": {
+    "description": "Appointments button"
+  },
+  
+  "help": "Help",
+  "@help": {
+    "description": "Help button"
+  },
+  
+  "cardManagement": "Card Management",
+  "@cardManagement": {
+    "description": "Card management service"
+  },
+  
+  "connectAccounts": "Connect Accounts",
+  "@connectAccounts": {
+    "description": "Connect accounts service"
+  },
+  
+  "spendingAnalytics": "Spending Analytics",
+  "@spendingAnalytics": {
+    "description": "Spending analytics service"
+  },
+  
+  "netWorth": "Net Worth",
+  "@netWorth": {
+    "description": "Net worth service"
+  },
+  
+  "transferMoney": "Transfer Money",
+  "@transferMoney": {
+    "description": "Transfer money service"
+  },
+  
+  "payBills": "Pay Bills",
+  "@payBills": {
+    "description": "Pay bills service"
+  },
+  
+  "depositCheck": "Deposit Check",
+  "@depositCheck": {
+    "description": "Deposit check service"
+  },
+  
+  "applyForLoan": "Apply for Loan",
+  "@applyForLoan": {
+    "description": "Apply for loan service"
+  },
+  
+  "openAccount": "Open Account",
+  "@openAccount": {
+    "description": "Open account service"
+  },
+  
+  "customerSupport": "Customer Support",
+  "@customerSupport": {
+    "description": "Customer support service"
+  },
+  
+  "recentTransactions": "Recent Transactions",
+  "@recentTransactions": {
+    "description": "Recent transactions section"
+  },
+  
+  "gameZone": "CU.APP Game Zone",
+  "@gameZone": {
+    "description": "Game zone section"
+  },
+  
+  "chatGpt": "CU.APPGPT",
+  "@chatGpt": {
+    "description": "Chat GPT section"
+  },
+  
+  "buildStrategy": "Build Strategy",
+  "@buildStrategy": {
+    "description": "Build strategy section"
+  }
+}

@@ -1,0 +1,26 @@
+<!-- ============================================ -->
+<!-- ADD THIS TO YOUR ios/Runner/Info.plist -->
+<!-- Inside the <dict> tag, before </dict> -->
+<!-- ============================================ -->
+
+<!-- Deep Linking URL Schemes -->
+<key>CFBundleURLTypes</key>
+<array>
+  <dict>
+    <key>CFBundleTypeRole</key>
+    <string>Editor</string>
+    <key>CFBundleURLName</key>
+    <string>com.creditunion.banking</string>
+    <key>CFBundleURLSchemes</key>
+    <array>
+      <string>cuapp</string>
+    </array>
+  </dict>
+</array>
+
+<!-- Universal Links (for lm.cu.app) -->
+<key>com.apple.developer.associated-domains</key>
+<array>
+  <string>applinks:lm.cu.app</string>
+  <string>applinks:*.cu.app</string>
+</array>

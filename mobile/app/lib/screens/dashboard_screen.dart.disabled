@@ -1,0 +1,1437 @@
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'dart:async';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:cu_design_system_omni/cu_design_system_omni.dart';
+import '../services/banking_service.dart';
+import '../widgets/membership_services.dart';
+import '../widgets/home_services_widget.dart';
+import '../providers/profile_provider.dart';
+import '../services/feature_service.dart';
+import '../widgets/transaction_helpers.dart';
+import '../widgets/typewriter_text.dart';
+import '../helpers/account_helper.dart';
+import '../l10n/app_localizations.dart';
+import '../services/sound_service.dart';
+import 'game_screen.dart';
+import 'chat_onboarding_screen.dart';
+import 'account_detail_screen.dart';
+import 'code_demo_screen.dart';
+
+extension StringExtension on String {
+  String capitalize() {
+    return "${this[0].toUpperCase()}${substring(1)}";
+  }
+}
+
+class DashboardScreen extends ConsumerStatefulWidget {
+  final ScrollController? scrollController;
+
+  const DashboardScreen({super.key, this.scrollController});
+
+  @override
+  ConsumerState<DashboardScreen> createState() => _DashboardScreenState();
+}
+
+class _DashboardScreenState extends ConsumerState<DashboardScreen>
+    with TickerProviderStateMixin {
+  final BankingService _bankingService = BankingService();
+  double _totalBalance = 0.0;
+  List<Map<String, dynamic>> _accounts = [];
+  bool _isLoading = true;
+  late AnimationController _gradientController;
+  late Animation<double> _gradientAnimation;
+  late AnimationController _typewriterController;
+  String _currentPlaceholder = '';
+  int _placeholderIndex = 0;
+  int _charIndex = 0;
+  List<String> _placeholderTexts = [];
+  Timer? _typewriterTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    _gradientController = AnimationController(
+      duration: const Duration(seconds: 8),
+      vsync: this,
+    )..repeat();
+
+    _gradientAnimation = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(CurvedAnimation(
+      parent: _gradientController,
+      curve: Curves.easeInOut,
+    ));
+
+    _typewriterController = AnimationController(
+      duration: const Duration(milliseconds: 100),
+      vsync: this,
+    );
+
+    _initializePlaceholderTexts();
+    _startTypewriterAnimation();
+    _loadData();
+  }
+
+  void _initializePlaceholderTexts() {
+    final hour = DateTime.now().hour;
+    String greeting = 'Good morning';
+    if (hour >= 12 && hour < 17) {
+      greeting = 'Good afternoon';
+    } else if (hour >= 17 || hour < 5) {
+      greeting = 'Good evening';
+    }
+
+    _placeholderTexts = [
+      '$greeting! What can I help you with?',
+      'Search "transfer money"',
+      'Try "pay credit card"',
+      'Find "ATM near me"',
+      'Look up "last month statement"',
+      'Search "spending insights"',
+      'Try "set up bill pay"',
+      'Find "mortgage rates"',
+    ];
+  }
+
+  void _startTypewriterAnimation() {
+    _typewriterTimer =
+        Timer.periodic(const Duration(milliseconds: 100), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+
+      setState(() {
+        if (_charIndex < _placeholderTexts[_placeholderIndex].length) {
+          _currentPlaceholder =
+              _placeholderTexts[_placeholderIndex].substring(0, _charIndex + 1);
+          _charIndex++;
+        } else {
+          timer.cancel();
+          Future.delayed(const Duration(seconds: 3), () {
+            if (mounted) {
+              _fadeToNextPlaceholder();
+            }
+          });
+        }
+      });
+    });
+  }
+
+  void _fadeToNextPlaceholder() {
+    _typewriterController.forward().then((_) {
+      if (!mounted) return;
+
+      setState(() {
+        _placeholderIndex = (_placeholderIndex + 1) % _placeholderTexts.length;
+        _charIndex = 0;
+        _currentPlaceholder = '';
+      });
+
+      _typewriterController.reset();
+      _startTypewriterAnimation();
+    });
+  }
+
+  @override
+  void dispose() {
+    _gradientController.dispose();
+    _typewriterController.dispose();
+    _typewriterTimer?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _loadData() async {
+    try {
+      print('Loading accounts data from banking service...');
+      final accounts = await _bankingService.getUserAccounts();
+      print('Received ${accounts.length} accounts from banking service');
+
+      final balance = accounts.fold<double>(
+        0.0,
+        (sum, account) => sum + (account['balance'] ?? 0.0),
+      );
+
+      setState(() {
+        _accounts = accounts;
+        _totalBalance = balance;
+        _isLoading = false;
+      });
+
+      print(
+          'Dashboard updated with ${accounts.length} accounts and balance \$${balance.toStringAsFixed(2)}');
+    } catch (e) {
+      print('Error in dashboard _loadData: $e');
+
+      setState(() {
+        _accounts = [];
+        _totalBalance = 0.0;
+        _isLoading = false;
+      });
+    }
+  }
+
+  void _navigateToTransfers(BuildContext context) {
+    WidgetJourneyLogger.logInteraction(
+      widgetName: 'Transfer Button',
+      widgetType: 'CUButton',
+      action: 'press',
+      metadata: {'location': 'dashboard_balance_card'},
+    );
+    SoundService().playTransfer();
+    Navigator.of(context).pushNamed('/transfer');
+  }
+
+  void _showCustomizeQuickActions(BuildContext context) {
+    WidgetJourneyLogger.logInteraction(
+      widgetName: 'Customize Quick Actions',
+      widgetType: 'CUButton',
+      action: 'press',
+      metadata: {'location': 'dashboard_quick_actions'},
+    );
+
+    showCUDialog(
+      context: context,
+      title: 'Customize Quick Actions',
+      description: 'Customization coming soon!',
+      actions: [
+        CUDialogAction(
+          label: 'OK',
+          onPressed: () => Navigator.pop(context),
+        ),
+      ],
+    );
+  }
+
+  String _getGreeting() {
+    final hour = DateTime.now().hour;
+    if (hour < 12) {
+      return 'Good Morning';
+    } else if (hour < 17) {
+      return 'Good Afternoon';
+    } else {
+      return 'Good Evening';
+    }
+  }
+
+  void _showDepositDialog(BuildContext context) {
+    WidgetJourneyLogger.logInteraction(
+      widgetName: 'Deposit Button',
+      widgetType: 'CUButton',
+      action: 'press',
+      metadata: {'location': 'dashboard_actions'},
+    );
+
+    showCUDialog(
+      context: context,
+      title: 'Deposit Money',
+      description: 'Deposit functionality coming soon!',
+      actions: [
+        CUDialogAction(
+          label: 'OK',
+          onPressed: () => Navigator.pop(context),
+        ),
+      ],
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final activeProfile = ref.watch(activeProfileProvider);
+    final profiles = ref.watch(profilesListProvider);
+
+    return CUScaffold(
+      appBar: const CUCompactAppBar(title: 'Dashboard'),
+      body: _isLoading
+          ? Center(child: CUSpinner())
+          : Column(
+              children: [
+                _buildProfileBar(activeProfile, profiles),
+                Expanded(
+                  child: CustomScrollView(
+                    controller: widget.scrollController,
+                    slivers: [
+                      SliverToBoxAdapter(
+                        child: Column(
+                          children: [
+                            Padding(
+                              padding: const EdgeInsets.only(
+                                  left: 16.0, right: 16.0, bottom: 4.0),
+                              child: _buildGreetingCard(),
+                            ),
+                            Padding(
+                              padding: const EdgeInsets.only(
+                                  left: 16.0, right: 16.0, bottom: 16.0),
+                              child: _buildAnimatedBalanceCard(),
+                            ),
+                            const SizedBox(height: 16),
+                            _buildAccountsSection(),
+                            const SizedBox(height: 24),
+                            _buildGameCard(context),
+                            const SizedBox(height: 24),
+                            _buildChatCard(context),
+                            const SizedBox(height: 24),
+                            _buildCodeDemoCard(context),
+                            const SizedBox(height: 24),
+                            const MembershipServices(),
+                            const SizedBox(height: 24),
+                            const Padding(
+                              padding: EdgeInsets.symmetric(horizontal: 16.0),
+                              child: HomeServicesWidget(),
+                            ),
+                            const SizedBox(height: 24),
+                            TransactionHelpers.buildRecentTransactions(context),
+                            const SizedBox(height: 32),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+    );
+  }
+
+  Widget _buildProfileOption(
+    BuildContext context,
+    IconData icon,
+    String title,
+    String subtitle,
+    VoidCallback onTap,
+  ) {
+    final theme = Theme.of(context);
+    return GestureDetector(
+      onTap: () {
+        WidgetJourneyLogger.logInteraction(
+          widgetName: title,
+          widgetType: 'Profile Option',
+          action: 'tap',
+          metadata: {'subtitle': subtitle},
+        );
+        SoundService().playButtonTap();
+        onTap();
+      },
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        margin: const EdgeInsets.only(bottom: 8),
+        decoration: BoxDecoration(
+          color: Colors.transparent,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.primary.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(
+                icon,
+                color: theme.colorScheme.primary,
+                size: 20,
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: theme.colorScheme.onSurface,
+                      fontFamily: 'Geist',
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: theme.colorScheme.onSurfaceVariant,
+                      fontFamily: 'Geist',
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+            Icon(
+              Icons.chevron_right,
+              color: theme.colorScheme.onSurfaceVariant,
+              size: 20,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildProfileBar(
+      UserProfile? activeProfile, List<UserProfile> profiles) {
+    final theme = Theme.of(context);
+
+    return SafeArea(
+      bottom: false,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        color: theme.colorScheme.surface,
+        child: Row(
+          children: [
+            const Spacer(),
+            GestureDetector(
+              onTap: () {
+                WidgetJourneyLogger.logInteraction(
+                  widgetName: 'Profile Avatar',
+                  widgetType: 'CUAvatar',
+                  action: 'tap',
+                  metadata: {
+                    'profile': activeProfile?.firstName ?? 'User'
+                  },
+                );
+                SoundService().playButtonTap();
+                showModalBottomSheet(
+                  context: context,
+                  isScrollControlled: true,
+                  backgroundColor: Colors.transparent,
+                  builder: (context) => Container(
+                    margin: const EdgeInsets.only(top: 100),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.surface,
+                      borderRadius: const BorderRadius.vertical(
+                        top: Radius.circular(20),
+                      ),
+                    ),
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          width: 40,
+                          height: 4,
+                          decoration: BoxDecoration(
+                            color: theme.colorScheme.outline.withOpacity(0.4),
+                            borderRadius: BorderRadius.circular(2),
+                          ),
+                          margin: const EdgeInsets.only(bottom: 20),
+                        ),
+                        Row(
+                          children: [
+                            _buildAnimatedAvatar(theme),
+                            const SizedBox(width: 16),
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  activeProfile != null
+                                      ? '${activeProfile.firstName} ${activeProfile.lastName}'
+                                      : 'Member',
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w600,
+                                    color: theme.colorScheme.onSurface,
+                                    fontFamily: 'Geist',
+                                  ),
+                                ),
+                                CUBadge(
+                                  label: activeProfile?.membershipType.toString().split('.').last.capitalize() ?? 'General',
+                                  variant: CUBadgeVariant.warning,
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 24),
+                        _buildProfileOption(
+                          context,
+                          Icons.person_outline,
+                          'View Profile',
+                          'Personal • Business • Fiduciary • Youth',
+                          () => Navigator.pop(context),
+                        ),
+                        _buildProfileOption(
+                          context,
+                          Icons.add_circle_outline,
+                          'Add Membership',
+                          'General • Business • Fiduciary • Youth • Student',
+                          () {
+                            Navigator.pop(context);
+                            _showAddAccountDialog(context);
+                          },
+                        ),
+                        _buildProfileOption(
+                          context,
+                          Icons.settings_outlined,
+                          'Settings',
+                          'App preferences and security',
+                          () {
+                            Navigator.pop(context);
+                            Navigator.of(context).pushNamed('/accessibility');
+                          },
+                        ),
+                        _buildProfileOption(
+                          context,
+                          Icons.logout,
+                          'Sign Out',
+                          'Logout from your account',
+                          () => Navigator.pop(context),
+                        ),
+                        const SizedBox(height: 20),
+                      ],
+                    ),
+                  ),
+                );
+              },
+              child: _buildAnimatedAvatar(theme),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAnimatedAvatar(ThemeData theme) {
+    final activeProfile = ref.watch(activeProfileProvider);
+    final initials = activeProfile != null
+        ? '${activeProfile.firstName[0]}${activeProfile.lastName[0]}'.toUpperCase()
+        : 'CU';
+
+    return TweenAnimationBuilder<double>(
+      duration: const Duration(seconds: 3),
+      tween: Tween(begin: 0.0, end: 1.0),
+      builder: (context, value, child) {
+        return CUAvatar(
+          initials: initials,
+          size: CUAvatarSize.md,
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              Color.lerp(theme.colorScheme.primary,
+                  theme.colorScheme.secondary, value)!,
+              Color.lerp(theme.colorScheme.secondary,
+                  theme.colorScheme.tertiary, value)!,
+              Color.lerp(theme.colorScheme.tertiary,
+                  theme.colorScheme.primary, value)!,
+            ],
+            stops: [0.0, 0.5, 1.0],
+            transform: GradientRotation(value * 2 * 3.14159),
+          ),
+          borderColor: Color(0xFFF7B731),
+          borderWidth: 2,
+        );
+      },
+    );
+  }
+
+  Widget _buildProfileAvatarWithInitials(UserProfile profile) {
+    final theme = Theme.of(context);
+    final initials =
+        '${profile.firstName[0]}${profile.lastName[0]}'.toUpperCase();
+
+    return CUAvatar(
+      initials: initials,
+      size: CUAvatarSize.sm,
+      backgroundColor: _getMembershipColor(profile.membershipType).withOpacity(0.2),
+      borderColor: theme.colorScheme.primary,
+      borderWidth: 2,
+    );
+  }
+
+  Color _getMembershipColor(MembershipType type) {
+    switch (type) {
+      case MembershipType.general:
+        return const Color(0xFF4ECDC4);
+      case MembershipType.business:
+        return const Color(0xFF6B5B95);
+      case MembershipType.youth:
+        return const Color(0xFFFF6B6B);
+      case MembershipType.fiduciary:
+        return const Color(0xFF1DB954);
+      case MembershipType.premium:
+        return const Color(0xFFF7B731);
+      case MembershipType.student:
+        return const Color(0xFF9B59B6);
+    }
+  }
+
+  String _formatBalance(double balance) {
+    if (balance >= 1000000) {
+      final millions = balance / 1000000;
+      return '${millions.toStringAsFixed(1)}M';
+    } else if (balance >= 1000) {
+      final thousands = balance / 1000;
+      return '${thousands.toStringAsFixed(0)}K';
+    } else {
+      return balance.toStringAsFixed(0);
+    }
+  }
+
+  Widget _buildGreetingCard() {
+    final theme = Theme.of(context);
+    final now = DateTime.now();
+    final hour = now.hour;
+
+    String greeting;
+    if (hour < 12) {
+      greeting = 'Good Morning';
+    } else if (hour < 17) {
+      greeting = 'Good Afternoon';
+    } else {
+      greeting = 'Good Evening';
+    }
+
+    return CUCard(
+      padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 16.0),
+      child: Text(
+        greeting,
+        style: TextStyle(
+          fontSize: 18,
+          color: theme.colorScheme.onSurface,
+          fontFamily: 'Geist',
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAnimatedBalanceCard() {
+    final theme = Theme.of(context);
+
+    return CUCard(
+      padding: const EdgeInsets.all(24.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Total Balance',
+            style: TextStyle(
+              fontSize: 14,
+              color: theme.colorScheme.onSurfaceVariant,
+              fontFamily: 'Geist',
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            '\$${_formatBalance(_totalBalance)}',
+            style: TextStyle(
+              fontSize: 42,
+              color: theme.colorScheme.onSurface,
+              fontFamily: 'Geist',
+              fontWeight: FontWeight.bold,
+              letterSpacing: -1,
+            ),
+          ),
+          const SizedBox(height: 20),
+          Row(
+            children: [
+              Expanded(
+                child: CUButton(
+                  onPressed: () => _navigateToTransfers(context),
+                  icon: const Icon(Icons.send, size: 18),
+                  fullWidth: true,
+                  variant: CUButtonVariant.primary,
+                  child: const Text('Transfer'),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: CUButton(
+                  onPressed: () {
+                    WidgetJourneyLogger.logInteraction(
+                      widgetName: 'Accounts Button',
+                      widgetType: 'CUButton',
+                      action: 'press',
+                      metadata: {'location': 'dashboard_balance_card'},
+                    );
+                    Navigator.of(context).pushNamed('/accounts');
+                  },
+                  icon: const Icon(Icons.account_balance, size: 18),
+                  fullWidth: true,
+                  variant: CUButtonVariant.secondary,
+                  child: const Text('Accounts'),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildGameCard(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      child: CUCard(
+        onTap: () {
+          WidgetJourneyLogger.logInteraction(
+            widgetName: 'Game Card',
+            widgetType: 'CUCard',
+            action: 'tap',
+            metadata: {'destination': 'game_screen'},
+          );
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (context) => const GameScreen(),
+            ),
+          );
+        },
+        padding: const EdgeInsets.all(20),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Colors.purple.shade400,
+            Colors.blue.shade400,
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(
+                    Icons.gamepad,
+                    color: Colors.white,
+                    size: 24,
+                  ),
+                ),
+                const Spacer(),
+                CUBadge(
+                  label: 'PLAY',
+                  icon: Icons.gamepad,
+                  variant: CUBadgeVariant.warning,
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'CU.APP Game Zone',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                fontFamily: 'Geist',
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'Take a break and play Flappy Bird! Compete for high scores.',
+              style: TextStyle(
+                color: Colors.white.withOpacity(0.9),
+                fontSize: 13,
+                fontFamily: 'Geist',
+              ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Icon(Icons.emoji_events, color: Colors.yellow, size: 12),
+                const SizedBox(width: 4),
+                Text(
+                  'High: 0',
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.9),
+                    fontSize: 10,
+                    fontFamily: 'Geist',
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Icon(Icons.people, color: Colors.white70, size: 12),
+                const SizedBox(width: 4),
+                Text(
+                  '1.2k',
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.9),
+                    fontSize: 10,
+                    fontFamily: 'Geist',
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCodeDemoCard(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      child: CUCard(
+        onTap: () {
+          WidgetJourneyLogger.logInteraction(
+            widgetName: 'Code Demo Card',
+            widgetType: 'CUCard',
+            action: 'tap',
+            metadata: {'destination': 'code_demo_screen'},
+          );
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (context) => const CodeDemoScreen(),
+            ),
+          );
+        },
+        padding: const EdgeInsets.all(20),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Colors.black87,
+            Colors.grey.shade900,
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(
+                    Icons.terminal,
+                    color: Colors.green,
+                    size: 24,
+                  ),
+                ),
+                const Spacer(),
+                CUBadge(
+                  label: 'VIEW CODE',
+                  icon: Icons.code,
+                  variant: CUBadgeVariant.success,
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'See How We Built This App',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                fontFamily: 'Geist',
+              ),
+            ),
+            const SizedBox(height: 6),
+            TypewriterText(
+              text:
+                  'Hey CU_APP, I got a strategy for you - A full acquisition plan with Flutter magic...',
+              style: TextStyle(
+                color: Colors.green.shade400,
+                fontSize: 13,
+                fontFamily: 'monospace',
+              ),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Icon(Icons.code, color: Colors.green, size: 12),
+                const SizedBox(width: 4),
+                Text(
+                  'Flutter',
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.9),
+                    fontSize: 10,
+                    fontFamily: 'Geist',
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Icon(Icons.layers, color: Colors.blue, size: 12),
+                const SizedBox(width: 4),
+                Text(
+                  'Supabase',
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.9),
+                    fontSize: 10,
+                    fontFamily: 'Geist',
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Icon(Icons.analytics, color: Colors.orange, size: 12),
+                const SizedBox(width: 4),
+                Text(
+                  'Strategy',
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.9),
+                    fontSize: 10,
+                    fontFamily: 'Geist',
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildChatCard(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      child: CUCard(
+        onTap: () {
+          WidgetJourneyLogger.logInteraction(
+            widgetName: 'Chat Card',
+            widgetType: 'CUCard',
+            action: 'tap',
+            metadata: {'destination': 'chat_onboarding_screen'},
+          );
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (context) => const ChatOnboardingScreen(),
+            ),
+          );
+        },
+        padding: const EdgeInsets.all(20),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Colors.green.shade400,
+            Colors.teal.shade400,
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(
+                    Icons.chat_bubble_outline,
+                    color: Colors.white,
+                    size: 24,
+                  ),
+                ),
+                const Spacer(),
+                CUBadge(
+                  label: 'ASK AI',
+                  icon: Icons.psychology,
+                  variant: CUBadgeVariant.default_,
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'CU.APPGPT',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                fontFamily: 'Geist',
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'Your intelligent banking assistant. Ask questions about your finances, get insights, or request help with transactions.',
+              style: TextStyle(
+                color: Colors.white.withOpacity(0.9),
+                fontSize: 13,
+                fontFamily: 'Geist',
+              ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Icon(Icons.lightbulb_outline,
+                    color: Colors.yellow, size: 12),
+                const SizedBox(width: 4),
+                Text(
+                  'Smart Insights',
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.9),
+                    fontSize: 10,
+                    fontFamily: 'Geist',
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Icon(Icons.security, color: Colors.white70, size: 12),
+                const SizedBox(width: 4),
+                Text(
+                  'Secure',
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.9),
+                    fontSize: 10,
+                    fontFamily: 'Geist',
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Icon(Icons.speed, color: Colors.white70, size: 12),
+                const SizedBox(width: 4),
+                Text(
+                  'Fast',
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.9),
+                    fontSize: 10,
+                    fontFamily: 'Geist',
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAccountsSection() {
+    final theme = Theme.of(context);
+    final pinnedAccounts =
+        _accounts.where((acc) => acc['is_pinned'] == true).toList();
+    final unpinnedAccounts =
+        _accounts.where((acc) => acc['is_pinned'] != true).toList();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (pinnedAccounts.isNotEmpty) ...[
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16.0),
+            child: Text(
+              'Pinned',
+              style: theme.textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.w600,
+                fontFamily: 'Geist',
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            height: 120,
+            child: ListView.builder(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              itemCount: pinnedAccounts.length,
+              itemBuilder: (context, index) {
+                final account = pinnedAccounts[index];
+                return _buildAccountCard(account, theme, true);
+              },
+            ),
+          ),
+          const SizedBox(height: 24),
+        ],
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16.0),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'All Accounts',
+                style: theme.textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.w600,
+                  fontFamily: 'Geist',
+                ),
+              ),
+              CUButton(
+                onPressed: () {
+                  WidgetJourneyLogger.logInteraction(
+                    widgetName: 'Manage Accounts',
+                    widgetType: 'CUButton',
+                    action: 'press',
+                    metadata: {'location': 'accounts_section'},
+                  );
+                },
+                variant: CUButtonVariant.ghost,
+                child: const Text('Manage'),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
+        ListView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          itemCount: _accounts.length,
+          itemBuilder: (context, index) {
+            final account = _accounts[index];
+            return _buildVerticalAccountCard(account, theme);
+          },
+        ),
+      ],
+    );
+  }
+
+  Widget _buildAccountCard(
+      Map<String, dynamic> account, ThemeData theme, bool isPinned) {
+    final isPrimary = account['is_primary'] == true;
+    final accountConfig = AccountHelper.getAccountConfig(account);
+    final displayName = AccountHelper.getAccountDisplayName(account);
+    final accountMask = AccountHelper.getAccountMask(account);
+    final accountIcon = AccountHelper.getAccountIcon(account);
+
+    return Container(
+      width: 280,
+      margin: const EdgeInsets.only(right: 12),
+      child: CUCard(
+        onTap: () {
+          WidgetJourneyLogger.logInteraction(
+            widgetName: 'Account Card',
+            widgetType: 'CUCard',
+            action: 'tap',
+            metadata: {
+              'account': displayName,
+              'account_id': account['account_id'],
+            },
+          );
+          print('Navigating to account details: $displayName');
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (context) => AccountDetailScreen(account: account),
+            ),
+          );
+        },
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            accountConfig.primaryColor.withOpacity(0.05),
+            accountConfig.secondaryColor.withOpacity(0.1),
+          ],
+        ),
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: accountConfig.primaryColor.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(
+                    accountIcon,
+                    size: 20,
+                    color: accountConfig.primaryColor,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        displayName,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
+                          fontFamily: 'Geist',
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      Text(
+                        '${accountConfig.shortName} $accountMask',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                          fontFamily: 'Geist',
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                if (isPrimary)
+                  CUBadge(
+                    label: 'PRIMARY',
+                    variant: CUBadgeVariant.warning,
+                  ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Text(
+              AccountHelper.formatBalance(account),
+              style: theme.textTheme.headlineSmall?.copyWith(
+                fontWeight: FontWeight.bold,
+                fontFamily: 'Geist',
+                color: accountConfig.primaryColor,
+              ),
+              semanticsLabel:
+                  AccountHelper.getBalanceSemanticLabel(account),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildVerticalAccountCard(
+      Map<String, dynamic> account, ThemeData theme) {
+    final isPrimary = account['is_primary'] == true;
+    final isPinned = account['is_pinned'] == true;
+    final accountConfig = AccountHelper.getAccountConfig(account);
+    final displayName = AccountHelper.getAccountDisplayName(account);
+    final accountMask = AccountHelper.getAccountMask(account);
+    final accountIcon = AccountHelper.getAccountIcon(account);
+    final statusInfo = AccountHelper.getAccountStatus(account);
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      child: CUCard(
+        onTap: () {
+          WidgetJourneyLogger.logInteraction(
+            widgetName: 'Vertical Account Card',
+            widgetType: 'CUCard',
+            action: 'tap',
+            metadata: {
+              'account': displayName,
+              'account_id': account['account_id'],
+            },
+          );
+          print('Navigating to vertical account details: $displayName');
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (context) => AccountDetailScreen(account: account),
+            ),
+          );
+        },
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          children: [
+            CUAvatar(
+              icon: accountIcon,
+              size: CUAvatarSize.sm,
+              backgroundColor: accountConfig.primaryColor.withOpacity(0.1),
+              iconColor: accountConfig.primaryColor,
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          displayName,
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            fontWeight: FontWeight.w600,
+                            fontFamily: 'Geist',
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      if (isPrimary)
+                        CUBadge(
+                          label: 'PRIMARY',
+                          variant: CUBadgeVariant.warning,
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '${accountConfig.shortName} $accountMask',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                      fontFamily: 'Geist',
+                    ),
+                  ),
+                  if (statusInfo.status != 'Active')
+                    Text(
+                      statusInfo.status,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: statusInfo.color,
+                        fontWeight: FontWeight.w600,
+                        fontFamily: 'Geist',
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 16),
+            Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text(
+                  AccountHelper.formatBalanceCompact(account),
+                  style: theme.textTheme.bodyLarge?.copyWith(
+                    fontWeight: FontWeight.w600,
+                    fontFamily: 'Geist',
+                    color: accountConfig.primaryColor,
+                  ),
+                  semanticsLabel: AccountHelper.getBalanceSemanticLabel(account),
+                ),
+                if (isPinned)
+                  Container(
+                    margin: const EdgeInsets.only(top: 2),
+                    child: Icon(
+                      Icons.push_pin,
+                      size: 12,
+                      color: theme.colorScheme.primary,
+                    ),
+                  ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showAddAccountDialog(BuildContext context) {
+    final theme = Theme.of(context);
+
+    WidgetJourneyLogger.logInteraction(
+      widgetName: 'Add Account Dialog',
+      widgetType: 'CUDialog',
+      action: 'open',
+      metadata: {'trigger': 'profile_menu'},
+    );
+
+    showCUDialog(
+      context: context,
+      title: 'Add Membership',
+      description: 'Select the type of account you\'d like to add to your membership:',
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _buildAccountTypeOption(
+            context,
+            'Business Account',
+            'Separate business banking and transactions',
+            Icons.business,
+            theme.colorScheme.primary,
+          ),
+          const SizedBox(height: 12),
+          _buildAccountTypeOption(
+            context,
+            'Joint Account',
+            'Shared account with another member',
+            Icons.people,
+            Colors.green,
+          ),
+          const SizedBox(height: 12),
+          _buildAccountTypeOption(
+            context,
+            'Savings Account',
+            'Additional savings with competitive rates',
+            Icons.savings,
+            Colors.orange,
+          ),
+        ],
+      ),
+      actions: [
+        CUDialogAction(
+          label: 'Cancel',
+          onPressed: () => Navigator.of(context).pop(),
+          isDestructive: false,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildAccountTypeOption(
+    BuildContext context,
+    String title,
+    String subtitle,
+    IconData icon,
+    Color color,
+  ) {
+    return GestureDetector(
+      onTap: () {
+        WidgetJourneyLogger.logInteraction(
+          widgetName: 'Account Type Option',
+          widgetType: 'Button',
+          action: 'tap',
+          metadata: {'account_type': title},
+        );
+        Navigator.of(context).pop();
+        showCUToast(
+          context,
+          title: '$title creation coming soon!',
+          description: 'This feature will be available in the next update.',
+          variant: CUToastVariant.info,
+        );
+      },
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          border: Border.all(color: Colors.grey.shade300),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(
+                icon,
+                color: color,
+                size: 24,
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      fontFamily: 'Geist',
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    subtitle,
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.grey.shade600,
+                      fontFamily: 'Geist',
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(
+              Icons.arrow_forward_ios,
+              size: 16,
+              color: Colors.grey.shade400,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}

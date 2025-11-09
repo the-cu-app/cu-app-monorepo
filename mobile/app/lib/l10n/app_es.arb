@@ -1,0 +1,49 @@
+{
+  "@@locale": "es",
+  "appTitle": "CU.APP",
+  
+  "dashboard": "Panel Principal",
+  "services": "Servicios", 
+  "transactions": "Transacciones",
+  "transfer": "Transferir",
+  "settings": "Configuración",
+  
+  "accounts": "Cuentas",
+  "pinnedAccounts": "Cuentas Fijadas",
+  "allAccounts": "Todas las Cuentas",
+  
+  "balance": "Balance",
+  "currentBalance": "Balance Actual",
+  "availableBalance": "Disponible",
+  "primary": "PRINCIPAL",
+  
+  "checking": "Corriente",
+  "savings": "Ahorros",
+  "creditCard": "Tarjeta de Crédito",
+  "mortgage": "Hipoteca",
+  "personalLoan": "Préstamo Personal",
+  "moneyMarket": "Mercado Monetario",
+  "brokerage": "Inversiones",
+  
+  "quickActions": "Acciones Rápidas",
+  "scanQr": "Escanear QR",
+  "findAtm": "Buscar ATM",
+  "appointments": "Citas",
+  "help": "Ayuda",
+  
+  "cardManagement": "Gestión de Tarjetas",
+  "connectAccounts": "Conectar Cuentas",
+  "spendingAnalytics": "Análisis de Gastos",
+  "netWorth": "Patrimonio Neto",
+  "transferMoney": "Transferir Dinero",
+  "payBills": "Pagar Facturas",
+  "depositCheck": "Depositar Cheque",
+  "applyForLoan": "Solicitar Préstamo",
+  "openAccount": "Abrir Cuenta",
+  "customerSupport": "Atención al Cliente",
+  
+  "recentTransactions": "Transacciones Recientes",
+  "gameZone": "Zona de Juegos CU.APP",
+  "chatGpt": "CU.APPGPT",
+  "buildStrategy": "Estrategia de Desarrollo"
+}

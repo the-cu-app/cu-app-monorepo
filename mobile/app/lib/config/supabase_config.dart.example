@@ -1,0 +1,17 @@
+class SupabaseConfig {
+  // Replace with your actual Supabase credentials
+  static const String url = 'https://your-project.supabase.co';
+  static const String anonKey = 'your-anon-key-here';
+
+  // Database table names
+  static const String usersTable = 'users';
+  static const String accountsTable = 'accounts';
+  static const String transactionsTable = 'transactions';
+  static const String payeesTable = 'payees';
+  static const String scheduledPaymentsTable = 'scheduled_payments';
+  static const String chatMessagesTable = 'chat_messages';
+
+  // Storage bucket names
+  static const String documentsBucket = 'documents';
+  static const String profileImagesBucket = 'profile_images';
+}

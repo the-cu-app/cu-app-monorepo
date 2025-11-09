@@ -1,0 +1,226 @@
+#!/bin/bash
+# CU CLI - Unified command-line interface for CU banking platform management
+
+set -eo pipefail
+
+# Get script directory
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+CLI_DIR="$SCRIPT_DIR/cli"
+
+# Source libraries
+source "$CLI_DIR/lib/colors.sh"
+source "$CLI_DIR/lib/logging.sh"
+source "$CLI_DIR/lib/validators.sh"
+source "$CLI_DIR/lib/supabase.sh"
+source "$CLI_DIR/lib/licensing.sh"
+
+# Version
+readonly VERSION="1.0.0"
+
+# Initialize logging
+init_logging
+
+# Show usage
+show_usage() {
+    cat << EOF
+${BOLD}${BLUE}CU CLI${NC} - Credit Union Platform Management Tool
+Version $VERSION
+
+${BOLD}USAGE:${NC}
+  cu <command> [options]
+
+${BOLD}COMMANDS:${NC}
+  ${CYAN}setup${NC}          Set up a new credit union (interactive wizard)
+  ${CYAN}subscription${NC}   Manage subscriptions and licensing ${GREEN}[NEW]${NC}
+  ${CYAN}content${NC}        Generate content (FAQs, Figma assets, docs)
+  ${CYAN}deploy${NC}         Deploy apps and services
+  ${CYAN}monitor${NC}        Monitor CU health and metrics
+  ${CYAN}doctor${NC}         Run diagnostics and health checks
+  ${CYAN}config${NC}         Manage CU configurations
+  ${CYAN}list${NC}           List all configured credit unions
+  ${CYAN}version${NC}        Show version information
+  ${CYAN}help${NC}           Show this help message
+
+${BOLD}OPTIONS:${NC}
+  -v, --verbose    Enable verbose output
+  -q, --quiet      Suppress non-error output
+  --json           Output in JSON format
+  --dry-run        Show what would be done without executing
+  -h, --help       Show help for specific command
+
+${BOLD}EXAMPLES:${NC}
+  ${DIM}# Set up a new credit union${NC}
+  ${CYAN}cu setup${NC}
+
+  ${DIM}# Generate all content for a CU${NC}
+  ${CYAN}cu content generate --cu-id navyfederal --all${NC}
+
+  ${DIM}# Deploy a CU to production${NC}
+  ${CYAN}cu deploy --cu-id navyfederal --env production${NC}
+
+  ${DIM}# Monitor all CUs${NC}
+  ${CYAN}cu monitor --dashboard${NC}
+
+  ${DIM}# Run health checks${NC}
+  ${CYAN}cu doctor --cu-id navyfederal${NC}
+
+${BOLD}CONFIGURATION:${NC}
+  Set these environment variables:
+    ${DIM}SUPABASE_URL${NC}              Supabase project URL
+    ${DIM}SUPABASE_ANON_KEY${NC}         Supabase anon key
+    ${DIM}SUPABASE_SERVICE_ROLE_KEY${NC} Supabase service role key (admin)
+    ${DIM}OPENAI_API_KEY${NC}            OpenAI API key (for content generation)
+
+  Example:
+    ${DIM}export SUPABASE_URL='https://your-project.supabase.co'${NC}
+    ${DIM}export SUPABASE_ANON_KEY='your-anon-key'${NC}
+
+${BOLD}DOCUMENTATION:${NC}
+  For more information, visit: https://docs.cu.app
+
+EOF
+}
+
+# Show version
+show_version() {
+    echo "CU CLI version $VERSION"
+}
+
+# Parse global options
+parse_global_options() {
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            -v|--verbose)
+                VERBOSE=true
+                shift
+                ;;
+            -q|--quiet)
+                CURRENT_LOG_LEVEL=$LOG_LEVEL_ERROR
+                shift
+                ;;
+            --json)
+                OUTPUT_FORMAT="json"
+                shift
+                ;;
+            --dry-run)
+                DRY_RUN=true
+                shift
+                ;;
+            *)
+                break
+                ;;
+        esac
+    done
+}
+
+# Main command router
+main() {
+    # Show usage if no arguments
+    if [ $# -eq 0 ]; then
+        show_usage
+        exit 0
+    fi
+
+    # Parse global options first
+    local args=("$@")
+    parse_global_options "${args[@]}"
+
+    # Get command
+    local command="${1:-}"
+    shift || true
+
+    # Route to command handler
+    case "$command" in
+        setup)
+            source "$CLI_DIR/commands/setup.sh"
+            cmd_setup "$@"
+            ;;
+        subscription|sub)
+            source "$CLI_DIR/commands/subscription.sh"
+            cmd_subscription "$@"
+            ;;
+        content)
+            source "$CLI_DIR/commands/content.sh"
+            cmd_content "$@"
+            ;;
+        deploy)
+            source "$CLI_DIR/commands/deploy.sh"
+            cmd_deploy "$@"
+            ;;
+        monitor)
+            source "$CLI_DIR/commands/monitor.sh"
+            cmd_monitor "$@"
+            ;;
+        doctor)
+            source "$CLI_DIR/commands/doctor.sh"
+            cmd_doctor "$@"
+            ;;
+        config)
+            source "$CLI_DIR/commands/config.sh"
+            cmd_config "$@"
+            ;;
+        list)
+            cmd_list "$@"
+            ;;
+        version)
+            show_version
+            ;;
+        help|-h|--help)
+            show_usage
+            ;;
+        *)
+            print_error "Unknown command: $command"
+            echo ""
+            echo "Run 'cu help' for usage information"
+            exit 1
+            ;;
+    esac
+}
+
+# List all CUs
+cmd_list() {
+    print_header "Credit Unions"
+
+    if ! check_supabase_config; then
+        exit 1
+    fi
+
+    log_info "Fetching credit unions from Supabase..."
+
+    local cus
+    cus=$(supabase_list_cus)
+
+    if [ $? -ne 0 ]; then
+        log_error "Failed to fetch credit unions"
+        exit 1
+    fi
+
+    local count
+    count=$(echo "$cus" | jq length)
+
+    if [ "$count" -eq 0 ]; then
+        print_warning "No credit unions found"
+        echo ""
+        echo "Run 'cu setup' to create your first credit union"
+        exit 0
+    fi
+
+    echo ""
+    print_table_header "CU Code" "Name" "Status"
+
+    echo "$cus" | jq -r '.[] | [.cu_code, .display_name, (if .is_active then "Active" else "Inactive" end)] | @tsv' | while IFS=$'\t' read -r code name status; do
+        if [ "$status" = "Active" ]; then
+            status="${GREEN}●${NC} Active"
+        else
+            status="${RED}●${NC} Inactive"
+        fi
+        print_table_row "$code" "$name" "$status"
+    done
+
+    echo ""
+    log_success "Found $count credit union(s)"
+    echo ""
+}
+
+# Run main function
+main "$@"

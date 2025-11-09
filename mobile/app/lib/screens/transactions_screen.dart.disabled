@@ -1,0 +1,323 @@
+import 'package:flutter/material.dart';
+import 'package:cu_design_system_omni/cu_design_system_omni.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import '../services/transaction_service.dart';
+import '../widgets/merchant_logo_widget.dart';
+import 'transaction_search_screen.dart';
+
+class TransactionsScreen extends StatefulWidget {
+  const TransactionsScreen({super.key});
+
+  @override
+  State<TransactionsScreen> createState() => _TransactionsScreenState();
+}
+
+class _TransactionsScreenState extends State<TransactionsScreen> {
+  final TransactionService _transactionService = TransactionService();
+  final _supabase = Supabase.instance.client;
+
+  List<Map<String, dynamic>> _transactions = [];
+  bool _isLoading = true;
+  double _totalSpending = 0;
+  double _totalIncome = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadTransactions();
+  }
+
+  Future<void> _loadTransactions() async {
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      final result = await _transactionService.getTransactions(
+        pageSize: 50,
+        forceRefresh: true,
+      );
+
+      _calculateTotals(result.transactions);
+
+      setState(() {
+        _transactions = result.transactions;
+        _isLoading = false;
+      });
+    } catch (e) {
+      debugPrint('Error loading transactions: $e');
+      setState(() {
+        _transactions = [];
+        _isLoading = false;
+      });
+    }
+  }
+
+  void _calculateTotals(List<Map<String, dynamic>> transactions) {
+    double spending = 0;
+    double income = 0;
+
+    for (final transaction in transactions) {
+      final amountCents = transaction['amount'] ?? 0;
+      final amount = amountCents / 100.0;
+
+      if (amount < 0) {
+        income += amount.abs();
+      } else {
+        spending += amount;
+      }
+    }
+
+    _totalSpending = spending;
+    _totalIncome = income;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final theme = Theme.of(context);
+
+    return Scaffold(
+      backgroundColor: isDark ? Colors.black : const Color(0xFFF5F5F5),
+      body: SafeArea(
+        child: Column(
+          children: [
+            // Search bar using CU Input
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: CUInput(
+                placeholder: 'Search transactions...',
+                prefixIcon: Icons.search,
+                suffixIcon: Icons.tune,
+                readOnly: true,
+                onTap: () {
+                  WidgetJourneyLogger.log('transactions_search_tapped');
+                  Navigator.push(
+                    context,
+                    PageRouteBuilder(
+                      pageBuilder: (context, animation, secondaryAnimation) => const TransactionSearchScreen(),
+                      transitionsBuilder: (context, animation, secondaryAnimation, child) {
+                        return FadeTransition(
+                          opacity: animation,
+                          child: child,
+                        );
+                      },
+                    ),
+                  );
+                },
+              ),
+            ),
+
+            const SizedBox(height: 20),
+
+            // Transactions Header
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20.0),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  CUText(
+                    'Transactions (${_transactions.length})',
+                    variant: CUTextVariant.h3,
+                  ),
+                  CUButton(
+                    label: 'Export',
+                    variant: CUButtonVariant.ghost,
+                    leftIcon: Icons.download,
+                    onPressed: () {
+                      WidgetJourneyLogger.log('transactions_export_tapped');
+                      _exportTransactions();
+                    },
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 8),
+
+            CUSeparator(spacing: 16),
+
+            // Transactions List
+            Expanded(
+              child: _isLoading
+                  ? const Center(child: CUSpinner())
+                  : _transactions.isEmpty
+                      ? Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.receipt_long,
+                                size: 64,
+                                color: isDark ? Colors.grey[700] : Colors.grey[300],
+                              ),
+                              const SizedBox(height: 16),
+                              CUText(
+                                'No transactions yet',
+                                variant: CUTextVariant.h4,
+                                color: isDark ? Colors.grey[600] : Colors.grey[400],
+                              ),
+                              const SizedBox(height: 8),
+                              CUText(
+                                'Link an account to see your transactions',
+                                variant: CUTextVariant.body,
+                                color: isDark ? Colors.grey[700] : Colors.grey[500],
+                              ),
+                            ],
+                          ),
+                        )
+                      : ListView.builder(
+                          padding: const EdgeInsets.symmetric(horizontal: 20),
+                          itemCount: _transactions.length,
+                          itemBuilder: (context, index) {
+                            final item = _transactions[index];
+                            return _buildTransactionTile(item, isDark);
+                          },
+                        ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTransactionTile(Map<String, dynamic> transaction, bool isDark) {
+    final amountCents = transaction['amount'] ?? 0;
+    final amount = amountCents / 100.0;
+    final isIncome = amount < 0;
+    final displayAmount = amount.abs();
+    final isPending = transaction['pending'] ?? false;
+    final isRecurring = transaction['is_recurring'] ?? false;
+    final merchantName = transaction['merchant_name'] ?? transaction['name'] ?? 'Unknown';
+    final category = transaction['primary_category'] ?? transaction['category'] ?? 'General';
+    final accountName = transaction['accounts']?['account_name'] ?? transaction['account_name'] ?? '';
+    final transactionDate = transaction['posted_at'] ?? transaction['date'] ?? transaction['authorized_date'];
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: CUCard(
+        onTap: () {
+          WidgetJourneyLogger.log('transaction_tile_tapped', properties: {
+            'merchant': merchantName,
+            'amount': amount,
+            'pending': isPending,
+          });
+        },
+        child: Row(
+          children: [
+            // Real merchant logo
+            MerchantLogoWidget(
+              merchantName: merchantName,
+              category: category,
+              size: 48,
+            ),
+            const SizedBox(width: 16),
+
+            // Details
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: CUText(
+                          merchantName,
+                          variant: CUTextVariant.body,
+                          weight: CUFontWeight.medium,
+                        ),
+                      ),
+                      if (isPending)
+                        Padding(
+                          padding: const EdgeInsets.only(left: 8),
+                          child: CUBadge(
+                            label: 'PENDING',
+                            variant: CUBadgeVariant.warning,
+                          ),
+                        ),
+                      if (isRecurring)
+                        Padding(
+                          padding: const EdgeInsets.only(left: 8),
+                          child: Icon(
+                            Icons.repeat,
+                            size: 18,
+                            color: Colors.blue[400],
+                          ),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      CUText(
+                        category,
+                        variant: CUTextVariant.bodySmall,
+                        color: isDark ? Colors.grey[400] : Colors.grey[600],
+                      ),
+                      if (transactionDate != null) ...[
+                        CUText(
+                          ' • ',
+                          variant: CUTextVariant.bodySmall,
+                          color: isDark ? Colors.grey[400] : Colors.grey[600],
+                        ),
+                        CUText(
+                          _formatDate(DateTime.parse(transactionDate)),
+                          variant: CUTextVariant.bodySmall,
+                          color: isDark ? Colors.grey[400] : Colors.grey[600],
+                        ),
+                      ],
+                    ],
+                  ),
+                ],
+              ),
+            ),
+
+            // Amount
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                CUText(
+                  '${isIncome ? '+' : '-'}\$${displayAmount.toStringAsFixed(2)}',
+                  variant: CUTextVariant.h4,
+                  weight: CUFontWeight.semibold,
+                  color: isIncome ? Colors.green[500] : (isDark ? Colors.white : Colors.black),
+                ),
+                if (accountName.isNotEmpty) ...[
+                  const SizedBox(height: 2),
+                  CUText(
+                    accountName,
+                    variant: CUTextVariant.caption,
+                    color: isDark ? Colors.grey[500] : Colors.grey[600],
+                  ),
+                ],
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _formatDate(DateTime date) {
+    final now = DateTime.now();
+    final difference = now.difference(date);
+
+    if (difference.inDays == 0) {
+      return 'Today, ${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
+    } else if (difference.inDays == 1) {
+      return 'Yesterday, ${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
+    } else if (difference.inDays < 7) {
+      return '${difference.inDays} days ago, ${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
+    } else {
+      return '${date.month}/${date.day}/${date.year}';
+    }
+  }
+
+  void _exportTransactions() {
+    CUToast.show(
+      context: context,
+      message: 'Export feature coming soon!',
+      variant: CUToastVariant.info,
+    );
+  }
+}

@@ -1,0 +1,474 @@
+import 'package:flutter/material.dart';
+import 'package:cu_design_system_omni/cu_design_system_omni.dart';
+import 'package:flutter/services.dart';
+import 'package:cu_design_system_omni/cu_design_system_omni.dart';
+import '../models/zelle_model.dart';
+import '../services/zelle_service.dart';
+import 'zelle_send_screen.dart';
+import 'zelle_request_screen.dart';
+
+class ZelleContactsScreen extends StatefulWidget {
+  const ZelleContactsScreen({super.key});
+
+  @override
+  State<ZelleContactsScreen> createState() => _ZelleContactsScreenState();
+}
+
+class _ZelleContactsScreenState extends State<ZelleContactsScreen>
+    with SingleTickerProviderStateMixin {
+  final ZelleService _zelleService = ZelleService();
+  final TextEditingController _searchController = TextEditingController();
+  late TabController _tabController;
+  
+  List<ZelleRecipient> _allRecipients = [];
+  List<ZelleRecipient> _favoriteRecipients = [];
+  List<ZelleRecipient> _recentRecipients = [];
+  List<ZelleRecipient> _filteredRecipients = [];
+  
+  bool _isLoading = false;
+  String _searchQuery = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 3, vsync: this);
+    _loadRecipients();
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadRecipients() async {
+    setState(() => _isLoading = true);
+
+    try {
+      final results = await Future.wait([
+        _zelleService.getAllRecipients(),
+        _zelleService.getFavoriteRecipients(),
+        _zelleService.getRecentRecipients(),
+      ]);
+
+      setState(() {
+        _allRecipients = results[0];
+        _favoriteRecipients = results[1];
+        _recentRecipients = results[2];
+        _filteredRecipients = _allRecipients;
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() => _isLoading = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          ScaffoldMessenger.of(context).showSnackBar(
+
+            SnackBar(content: Text(Failed to load contacts: $e)),
+
+          );
+      }
+    }
+  }
+
+  void _filterRecipients(String query) {
+    setState(() {
+      _searchQuery = query;
+      if (query.isEmpty) {
+        _filteredRecipients = _allRecipients;
+      } else {
+        _filteredRecipients = _allRecipients.where((recipient) {
+          final nameLower = recipient.name.toLowerCase();
+          final emailLower = recipient.email.toLowerCase();
+          final queryLower = query.toLowerCase();
+          return nameLower.contains(queryLower) ||
+              emailLower.contains(queryLower) ||
+              (recipient.phone?.contains(query) ?? false);
+        }).toList();
+      }
+    });
+  }
+
+  Future<void> _toggleFavorite(ZelleRecipient recipient) async {
+    final success = await _zelleService.toggleFavorite(recipient.id);
+    if (success) {
+      HapticFeedback.lightImpact();
+      await _loadRecipients();
+    }
+  }
+
+  Future<void> _showAddRecipientDialog() async {
+    final nameController = TextEditingController();
+    final emailController = TextEditingController();
+    final phoneController = TextEditingController();
+
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Add New Recipient'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: nameController,
+                decoration: const InputDecoration(
+                  labelText: 'Name',
+                  prefixIcon: Icon(Icons.person),
+                  border: OutlineInputBorder(),
+                ),
+                textCapitalization: TextCapitalization.words,
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: emailController,
+                decoration: const InputDecoration(
+                  labelText: 'Email',
+                  prefixIcon: Icon(Icons.email),
+                  border: OutlineInputBorder(),
+                ),
+                keyboardType: TextInputType.emailAddress,
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: phoneController,
+                decoration: const InputDecoration(
+                  labelText: 'Phone (Optional)',
+                  prefixIcon: Icon(Icons.phone),
+                  border: OutlineInputBorder(),
+                ),
+                keyboardType: TextInputType.phone,
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () async {
+              if (nameController.text.isNotEmpty &&
+                  emailController.text.isNotEmpty) {
+                final recipient = await _zelleService.addRecipient(
+                  name: nameController.text,
+                  email: emailController.text,
+                  phone: phoneController.text.isNotEmpty
+                      ? phoneController.text
+                      : null,
+                );
+                if (recipient != null && mounted) {
+                  Navigator.pop(context, true);
+                }
+              }
+            },
+            child: const Text('Add'),
+          ),
+        ],
+      ),
+    );
+
+    if (result == true) {
+      await _loadRecipients();
+    }
+  }
+
+  Future<void> _importContacts() async {
+    final importedContacts = await _zelleService.importContacts();
+    
+    if (importedContacts.isNotEmpty && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          ScaffoldMessenger.of(context).showSnackBar(
+
+            SnackBar(content: Text(Imported ${importedContacts.length} contacts)),
+
+          );
+      await _loadRecipients();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Zelle Contacts'),
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(48),
+          child: TabBar(
+            controller: _tabController,
+            tabs: const [
+              Tab(text: 'All'),
+              Tab(text: 'Favorites'),
+              Tab(text: 'Recent'),
+            ],
+          ),
+        ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.person_add),
+            onPressed: _showAddRecipientDialog,
+          ),
+          IconButton(
+            icon: const Icon(Icons.import_contacts),
+            onPressed: _importContacts,
+          ),
+        ],
+      ),
+      body: Column(
+        children: [
+          // Search bar
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: TextField(
+              controller: _searchController,
+              onChanged: _filterRecipients,
+              decoration: InputDecoration(
+                hintText: 'Search by name, email, or phone',
+                prefixIcon: const Icon(Icons.search),
+                suffixIcon: _searchQuery.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(Icons.clear),
+                        onPressed: () {
+                          _searchController.clear();
+                          _filterRecipients('');
+                        },
+                      )
+                    : null,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                filled: true,
+                fillColor: colorScheme.surfaceVariant,
+              ),
+            ),
+          ),
+          
+          // Tab content
+          Expanded(
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : TabBarView(
+                    controller: _tabController,
+                    children: [
+                      _buildContactsList(_searchQuery.isEmpty
+                          ? _allRecipients
+                          : _filteredRecipients),
+                      _buildContactsList(_favoriteRecipients),
+                      _buildContactsList(_recentRecipients),
+                    ],
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildContactsList(List<ZelleRecipient> recipients) {
+    if (recipients.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.people_outline,
+              size: 64,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'No contacts found',
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return ListView.builder(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      itemCount: recipients.length,
+      itemBuilder: (context, index) {
+        final recipient = recipients[index];
+        return _buildContactCard(recipient);
+      },
+    );
+  }
+
+  Widget _buildContactCard(ZelleRecipient recipient) {
+    final colorScheme = Theme.of(context).colorScheme;
+    
+    return Card(
+      margin: const EdgeInsets.only(bottom: 8),
+      child: ListTile(
+        leading: CircleAvatar(
+          backgroundColor: recipient.isEnrolled
+              ? colorScheme.primaryContainer
+              : colorScheme.surfaceVariant,
+          child: recipient.profileImage != null
+              ? ClipOval(
+                  child: Image.network(
+                    recipient.profileImage!,
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) =>
+                        Text(recipient.name[0].toUpperCase()),
+                  ),
+                )
+              : Text(
+                  recipient.name[0].toUpperCase(),
+                  style: TextStyle(
+                    color: recipient.isEnrolled
+                        ? colorScheme.onPrimaryContainer
+                        : colorScheme.onSurfaceVariant,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+        ),
+        title: Row(
+          children: [
+            Expanded(
+              child: Text(
+                recipient.name,
+                style: const TextStyle(fontWeight: FontWeight.w600),
+              ),
+            ),
+            if (recipient.isEnrolled)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: Colors.green,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Text(
+                  'Enrolled',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+          ],
+        ),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(recipient.email),
+            if (recipient.phone != null) Text(recipient.phone!),
+            if (recipient.lastPaymentDate != null)
+              Text(
+                'Last payment: \$${recipient.lastPaymentAmount?.toStringAsFixed(2)} on ${_formatDate(recipient.lastPaymentDate!)}',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: colorScheme.onSurfaceVariant,
+                ),
+              ),
+          ],
+        ),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            IconButton(
+              icon: Icon(
+                recipient.isFavorite ? Icons.star : Icons.star_border,
+                color: recipient.isFavorite ? Colors.amber : null,
+              ),
+              onPressed: () => _toggleFavorite(recipient),
+            ),
+            PopupMenuButton<String>(
+              itemBuilder: (context) => [
+                const PopupMenuItem(
+                  value: 'send',
+                  child: Row(
+                    children: [
+                      Icon(Icons.send),
+                      SizedBox(width: 8),
+                      Text('Send Money'),
+                    ],
+                  ),
+                ),
+                const PopupMenuItem(
+                  value: 'request',
+                  child: Row(
+                    children: [
+                      Icon(Icons.request_page),
+                      SizedBox(width: 8),
+                      Text('Request Money'),
+                    ],
+                  ),
+                ),
+                const PopupMenuItem(
+                  value: 'edit',
+                  child: Row(
+                    children: [
+                      Icon(Icons.edit),
+                      SizedBox(width: 8),
+                      Text('Edit Contact'),
+                    ],
+                  ),
+                ),
+              ],
+              onSelected: (value) {
+                switch (value) {
+                  case 'send':
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => ZelleSendScreen(
+                          recipient: recipient,
+                        ),
+                      ),
+                    );
+                    break;
+                  case 'request':
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => ZelleRequestScreen(
+                          recipient: recipient,
+                        ),
+                      ),
+                    );
+                    break;
+                  case 'edit':
+                    // TODO: Implement edit contact
+                    break;
+                }
+              },
+            ),
+          ],
+        ),
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => ZelleSendScreen(
+                recipient: recipient,
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  String _formatDate(DateTime date) {
+    final now = DateTime.now();
+    final difference = now.difference(date);
+    
+    if (difference.inDays == 0) {
+      return 'Today';
+    } else if (difference.inDays == 1) {
+      return 'Yesterday';
+    } else if (difference.inDays < 7) {
+      return '${difference.inDays} days ago';
+    } else {
+      return '${date.month}/${date.day}/${date.year}';
+    }
+  }
+}

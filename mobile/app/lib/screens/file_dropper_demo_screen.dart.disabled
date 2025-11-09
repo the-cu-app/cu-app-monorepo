@@ -1,0 +1,475 @@
+import 'package:flutter/material.dart';
+import '../widgets/file_dropper_widget.dart';
+import '../services/file_upload_service.dart';
+import 'package:cu_design_system_omni/cu_design_system_omni.dart';
+
+/// Demo screen showcasing the FileDropperWidget
+class FileDropperDemoScreen extends StatefulWidget {
+  const FileDropperDemoScreen({super.key});
+
+  @override
+  State<FileDropperDemoScreen> createState() => _FileDropperDemoScreenState();
+}
+
+class _FileDropperDemoScreenState extends State<FileDropperDemoScreen> {
+  final _uploadService = FileUploadService();
+  String? _selectedBucket = 'uploads';
+  String? _selectedFolder;
+  List<String>? _allowedExtensions;
+  int? _maxFileSizeMB = 10;
+  bool _allowMultiple = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _initializeBucket();
+  }
+
+  Future<void> _initializeBucket() async {
+    // Create the default bucket if it doesn't exist
+    try {
+      await _uploadService.createBucket(_selectedBucket ?? 'uploads');
+    } catch (e) {
+      debugPrint('Bucket initialization: $e');
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('File Dropper Demo'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.settings),
+            onPressed: _showSettings,
+          ),
+        ],
+      ),
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Info card
+              _buildInfoCard(),
+
+              const SizedBox(height: 24),
+
+              // Current settings
+              _buildCurrentSettings(),
+
+              const SizedBox(height: 24),
+
+              // File dropper widget
+              FileDropperWidget(
+                bucket: _selectedBucket,
+                folder: _selectedFolder,
+                allowedExtensions: _allowedExtensions,
+                maxFileSizeMB: _maxFileSizeMB,
+                allowMultiple: _allowMultiple,
+                title: 'Drop your files here',
+                subtitle: 'Drag and drop or click to browse',
+                onUploadComplete: (results) {
+                  final successCount = results.where((r) => r.success).length;
+                  debugPrint('Upload completed: $successCount/${results.length} successful');
+                },
+                onError: (error) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(error),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                },
+              ),
+
+              const SizedBox(height: 24),
+
+              // Quick presets
+              _buildQuickPresets(),
+
+              const SizedBox(height: 24),
+
+              // File browser
+              _buildFileBrowser(),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInfoCard() {
+    return Card(
+      color: Theme.of(context).colorScheme.primaryContainer,
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  Icons.info_outline,
+                  color: Theme.of(context).colorScheme.onPrimaryContainer,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  'Welcome to File Dropper!',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        color: Theme.of(context).colorScheme.onPrimaryContainer,
+                      ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Upload files to Supabase Storage with drag-and-drop or file picker. '
+              'Configure settings using the gear icon above.',
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: Theme.of(context).colorScheme.onPrimaryContainer,
+                  ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCurrentSettings() {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Current Settings',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: 12),
+            _buildSettingRow('Bucket', _selectedBucket ?? 'default'),
+            _buildSettingRow('Folder', _selectedFolder ?? 'root'),
+            _buildSettingRow(
+              'Allowed Extensions',
+              _allowedExtensions?.join(', ') ?? 'All types',
+            ),
+            _buildSettingRow(
+              'Max File Size',
+              _maxFileSizeMB != null ? '${_maxFileSizeMB}MB' : 'Unlimited',
+            ),
+            _buildSettingRow(
+              'Multiple Files',
+              _allowMultiple ? 'Enabled' : 'Disabled',
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSettingRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4.0),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            label,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+          ),
+          Text(
+            value,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildQuickPresets() {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Quick Presets',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                _buildPresetChip(
+                  'Images Only',
+                  () => _applyPreset(
+                    extensions: ['jpg', 'jpeg', 'png', 'gif', 'webp'],
+                    maxSize: 5,
+                  ),
+                ),
+                _buildPresetChip(
+                  'Documents',
+                  () => _applyPreset(
+                    extensions: ['pdf', 'doc', 'docx', 'txt'],
+                    maxSize: 10,
+                  ),
+                ),
+                _buildPresetChip(
+                  'Videos',
+                  () => _applyPreset(
+                    extensions: ['mp4', 'mov', 'avi', 'mkv'],
+                    maxSize: 100,
+                  ),
+                ),
+                _buildPresetChip(
+                  'Audio',
+                  () => _applyPreset(
+                    extensions: ['mp3', 'wav', 'flac', 'm4a'],
+                    maxSize: 20,
+                  ),
+                ),
+                _buildPresetChip(
+                  'Any File',
+                  () => _applyPreset(
+                    extensions: null,
+                    maxSize: null,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPresetChip(String label, VoidCallback onTap) {
+    return ActionChip(
+      label: Text(label),
+      onPressed: onTap,
+      avatar: const Icon(Icons.filter_alt, size: 18),
+    );
+  }
+
+  Widget _buildFileBrowser() {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Uploaded Files',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+                TextButton.icon(
+                  onPressed: _refreshFileList,
+                  icon: const Icon(Icons.refresh),
+                  label: const Text('Refresh'),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            FutureBuilder(
+              future: _uploadService.listFiles(
+                bucket: _selectedBucket,
+                folder: _selectedFolder,
+              ),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+
+                if (snapshot.hasError) {
+                  return Center(
+                    child: Text('Error: ${snapshot.error}'),
+                  );
+                }
+
+                final files = snapshot.data ?? [];
+
+                if (files.isEmpty) {
+                  return Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(32.0),
+                      child: Column(
+                        children: [
+                          Icon(
+                            Icons.folder_open,
+                            size: 64,
+                            color: Theme.of(context).colorScheme.onSurfaceVariant,
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            'No files uploaded yet',
+                            style: Theme.of(context).textTheme.bodyLarge,
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                }
+
+                return ListView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: files.length,
+                  itemBuilder: (context, index) {
+                    final file = files[index];
+                    return ListTile(
+                      leading: const Icon(Icons.insert_drive_file),
+                      title: Text(file.name),
+                      subtitle: Text(
+                        'Updated: ${file.updatedAt ?? 'Unknown'}',
+                        style: const TextStyle(fontSize: 11),
+                      ),
+                      trailing: IconButton(
+                        icon: const Icon(Icons.delete),
+                        onPressed: () => _deleteFile(file.name),
+                      ),
+                    );
+                  },
+                );
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _applyPreset({
+    List<String>? extensions,
+    int? maxSize,
+  }) {
+    setState(() {
+      _allowedExtensions = extensions;
+      _maxFileSizeMB = maxSize;
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Preset applied')),
+    );
+  }
+
+  void _showSettings() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Upload Settings'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                decoration: const InputDecoration(
+                  labelText: 'Bucket Name',
+                  hintText: 'uploads',
+                ),
+                controller: TextEditingController(text: _selectedBucket),
+                onChanged: (value) => _selectedBucket = value,
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                decoration: const InputDecoration(
+                  labelText: 'Folder Path (optional)',
+                  hintText: 'my-folder',
+                ),
+                controller: TextEditingController(text: _selectedFolder),
+                onChanged: (value) =>
+                    _selectedFolder = value.isEmpty ? null : value,
+              ),
+              const SizedBox(height: 16),
+              SwitchListTile(
+                title: const Text('Allow Multiple Files'),
+                value: _allowMultiple,
+                onChanged: (value) {
+                  setState(() => _allowMultiple = value);
+                  Navigator.pop(context);
+                  _showSettings();
+                },
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () {
+              setState(() {});
+              Navigator.pop(context);
+            },
+            child: const Text('Apply'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _refreshFileList() async {
+    setState(() {});
+  }
+
+  Future<void> _deleteFile(String fileName) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete File'),
+        content: Text('Are you sure you want to delete "$fileName"?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      try {
+        final path = _selectedFolder != null
+            ? '$_selectedFolder/$fileName'
+            : fileName;
+        await _uploadService.deleteFile(
+          path: path,
+          bucket: _selectedBucket,
+        );
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('File deleted')),
+          );
+          _refreshFileList();
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Failed to delete: $e'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    }
+  }
+}
